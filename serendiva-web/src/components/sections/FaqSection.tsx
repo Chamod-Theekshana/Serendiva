@@ -3,7 +3,7 @@ import { useTranslations } from 'next-intl'
 import type { FaqItem } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 import { faqPageJsonLd } from '@/components/seo/jsonld'
-import { JsonLd } from '@/components/seo/JsonLd'
+import { JsonLd } from '@/components/seo/JsonLdScript'
 import { Accordion, type AccordionProps } from '@/components/ui/Accordion'
 import { SectionHeading } from '@/components/ui/SectionHeading'
 

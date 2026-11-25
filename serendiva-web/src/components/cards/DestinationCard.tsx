@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/Badge'
 import { Icon } from '@/components/ui/Icon'
 import { SmartImage } from '@/components/ui/SmartImage'
-import { shortHubLabel } from '@/components/destinations/islandMap'
+import { shortHubLabel } from '@/components/destinations/islandMapGeometry'
 import { regionTone } from '@/components/destinations/regionTones'
 
 export interface DestinationCardProps {

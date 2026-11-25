@@ -37,6 +37,20 @@ export function useLeadFormat() {
       const d = toDate(iso)
       return d ? format.relativeTime(d, now) : ''
     },
+    /** "12 Jan 2027" for a YYYY-MM-DD calendar date (UTC noon, no TZ shift). */
+    calendarDate(isoDay: string | null | undefined): string {
+      const d = parseCalendarDate(isoDay)
+      return d ? format.dateTime(d, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : ''
+    },
+    /** "12 Jan – 24 Jan 2027" for two YYYY-MM-DD calendar dates. */
+    calendarRange(startDay: string | null | undefined, endDay: string | null | undefined): string {
+      const start = parseCalendarDate(startDay)
+      const end = parseCalendarDate(endDay)
+      const opts = { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' } as const
+      if (start && end) return format.dateTimeRange(start, end, opts)
+      if (start) return t('fromDate', { date: format.dateTime(start, opts) })
+      return ''
+    },
     /** "12 Jan – 24 Jan 2027", the free travel window, or '' */
     travel(lead: { travelStart: string | null; travelEnd: string | null; travelWindow: string | null }): string {
       const start = parseCalendarDate(lead.travelStart)

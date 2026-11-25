@@ -7,6 +7,7 @@ import { publicEnv } from '@/lib/env'
 interface TurnstileApi {
   render: (el: HTMLElement, options: Record<string, unknown>) => string
   remove: (widgetId: string) => void
+  reset: (widgetId: string) => void
 }
 
 declare global {
@@ -20,6 +21,11 @@ export interface TurnstileProps {
   onToken: (token: string) => void
   /** Analytics label shown in the Cloudflare dashboard, e.g. 'inquiry'. */
   action?: string
+  /**
+   * Change it after every submit attempt (e.g. a counter): tokens are single-use, so the widget is reset and a
+   * fresh token is fetched — otherwise a retry or "send another" would reuse the spent token and be rejected.
+   */
+  resetKey?: number | string
   className?: string
 }
 
@@ -27,14 +33,24 @@ export interface TurnstileProps {
  * Cloudflare Turnstile challenge. Renders nothing unless NEXT_PUBLIC_TURNSTILE_SITE_KEY is set, so forms can
  * always include it: `<Turnstile onToken={(t) => setValue('turnstileToken', t)} action="inquiry" />`.
  */
-export function Turnstile({ onToken, action, className }: TurnstileProps) {
+export function Turnstile({ onToken, action, resetKey, className }: TurnstileProps) {
   const siteKey = publicEnv.turnstileSiteKey
   const container = useRef<HTMLDivElement>(null)
   const callback = useRef(onToken)
+  const widget = useRef<string | undefined>(undefined)
+  const lastReset = useRef(resetKey)
 
   useEffect(() => {
     callback.current = onToken
   }, [onToken])
+
+  useEffect(() => {
+    if (lastReset.current === resetKey) return
+    lastReset.current = resetKey
+    if (!widget.current || !window.turnstile) return
+    callback.current('')
+    window.turnstile.reset(widget.current)
+  }, [resetKey])
 
   useEffect(() => {
     if (!siteKey) return
@@ -50,6 +66,7 @@ export function Turnstile({ onToken, action, className }: TurnstileProps) {
         'expired-callback': () => callback.current(''),
         'error-callback': () => callback.current(''),
       })
+      widget.current = widgetId
       return true
     }
     const timer = window.setInterval(() => {
@@ -60,6 +77,7 @@ export function Turnstile({ onToken, action, className }: TurnstileProps) {
       cancelled = true
       window.clearInterval(timer)
       if (widgetId) window.turnstile?.remove(widgetId)
+      widget.current = undefined
     }
   }, [siteKey, action])
 

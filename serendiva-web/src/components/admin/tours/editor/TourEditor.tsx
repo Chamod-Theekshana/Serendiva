@@ -26,11 +26,13 @@ import { DetailsTab } from './DetailsTab'
 import { GalleryTab } from './GalleryTab'
 import { ItineraryTab } from './ItineraryTab'
 import {
+  cloneTourForDuplicate,
   EDITOR_TABS,
   filledLocales,
   fromAdmin,
   isEditorTab,
   newTourForm,
+  publishWarnings,
   snapshot,
   tabForPath,
   toWrite,
@@ -97,8 +99,11 @@ export function TourEditor({ id }: { id: string }) {
   const confirm = useConfirm()
   const router = useRouter()
 
+  const { value: duplicateId } = useUrlParam('duplicate')
+  const duplicating = isNew && Boolean(duplicateId)
+
   const [state, setState] = useState<EditorState | null>(() => {
-    if (isNew) {
+    if (isNew && !duplicateId) {
       const form = newTourForm()
       return { form, baseline: snapshot(form), tour: null }
     }
@@ -113,8 +118,20 @@ export function TourEditor({ id }: { id: string }) {
     enabled: !isNew && state === null,
     keepPreviousData: false,
   })
+  const duplicateQuery = useAdminQuery(
+    ['tours', 'duplicate', duplicateId],
+    (signal) => toursApi.get(duplicateId!, signal),
+    [],
+    {
+      enabled: duplicating && state === null,
+      keepPreviousData: false,
+    },
+  )
   // Initialise once from fresh data (never from a stale cache entry); later refetches never overwrite edits.
-  if (state === null && query.data && !query.fetching) setState(fromTour(query.data))
+  if (state === null && !duplicating && query.data && !query.fetching) setState(fromTour(query.data))
+  if (state === null && duplicating && duplicateQuery.data && !duplicateQuery.fetching) {
+    setState({ form: cloneTourForDuplicate(duplicateQuery.data), baseline: snapshot(newTourForm()), tour: null })
+  }
 
   const [locale, setLocale] = useState<AdminLocale>('en')
   const { value: tabValue, set: setTabParam } = useUrlParam('tab')
@@ -235,6 +252,19 @@ export function TourEditor({ id }: { id: string }) {
 
   const changeStatus = async (next: TourStatus) => {
     if (!state) return
+    if (next === 'published') {
+      const missing = publishWarnings(state.form)
+      if (missing.length > 0) {
+        const ok = await confirm({
+          title: t('publishIncompleteTitle'),
+          body: t('publishIncompleteBody', {
+            missing: missing.map((k) => t(`missingItems.${k}`)).join(', '),
+          }),
+          confirmLabel: t('publishAnyway'),
+        })
+        if (!ok) return
+      }
+    }
     if (isNew || dirty) return save(next)
     const start = state.form
     setStatusPending(true)
@@ -283,6 +313,20 @@ export function TourEditor({ id }: { id: string }) {
     }
   }
 
+  const discard = async () => {
+    if (!state?.tour || !dirty) return
+    const ok = await confirm({
+      title: t('discardTitle'),
+      body: t('discardBody'),
+      tone: 'danger',
+      confirmLabel: t('discardConfirm'),
+    })
+    if (!ok) return
+    setState(fromTour(state.tour))
+    setErrors({})
+    toast.info(t('discarded'))
+  }
+
   // ⌘/Ctrl+S saves.
   const onSaveShortcut = useEffectEvent(() => {
     if (!state) return
@@ -305,8 +349,10 @@ export function TourEditor({ id }: { id: string }) {
 
   // ------------------------------------------------------------------------------------------------ render
 
+  const activeQuery = duplicating ? duplicateQuery : query
+
   if (!form || !state) {
-    if (query.error?.isNotFound) {
+    if (activeQuery.error?.isNotFound) {
       return (
         <>
           <PageHeader title={t('notFoundTitle')} breadcrumbs={[{ label: t('breadcrumb'), href: '/admin/tours' }, { label: t('notFoundTitle') }]} />
@@ -314,7 +360,7 @@ export function TourEditor({ id }: { id: string }) {
             variant="card"
             icon="search_off"
             title={t('notFoundTitle')}
-            body={t('notFoundBody')}
+            body={duplicating ? t('duplicateLoadFailed') : t('notFoundBody')}
             action={
               <Button href="/admin/tours" variant="primary" icon="arrow_back">
                 {t('backToList')}
@@ -324,7 +370,7 @@ export function TourEditor({ id }: { id: string }) {
         </>
       )
     }
-    if (query.error) return <ErrorPanel error={query.error} onRetry={() => void query.refetch()} />
+    if (activeQuery.error) return <ErrorPanel error={activeQuery.error} onRetry={() => void activeQuery.refetch()} />
     return <LoadingPanel variant="form" rows={8} />
   }
 
@@ -355,7 +401,8 @@ export function TourEditor({ id }: { id: string }) {
     tabRefs.current[key]?.focus()
   }
 
-  const tabProps = { form, locale, errors, update }
+  const tabProps = { form, locale, errors, update, onJumpTab: setTab }
+  const duplicateSourceTitle = duplicateQuery.data ? duplicateQuery.data.title.en ?? duplicateQuery.data.slug : null
 
   return (
     <>
@@ -446,6 +493,12 @@ export function TourEditor({ id }: { id: string }) {
         aria-labelledby={`tour-tab-${tab}`}
         lang={locale === 'en' ? undefined : locale}
       >
+        {duplicating && duplicateSourceTitle && (
+          <p className="mb-4 flex items-center gap-2 rounded-xl border border-primary/20 bg-primary-fixed/30 px-4 py-2.5 font-body-md text-body-md text-on-surface">
+            <Icon name="content_copy" className="shrink-0 text-[18px] text-primary" />
+            <span>{t('duplicatingFrom', { title: duplicateSourceTitle })}</span>
+          </p>
+        )}
         {errors._form && (
           <p role="alert" className="mb-4 rounded-xl bg-error-container px-4 py-3 font-body-md text-body-md text-on-error-container">
             {errors._form}
@@ -490,6 +543,18 @@ export function TourEditor({ id }: { id: string }) {
               )}
             </span>
           </div>
+          {!isNew && dirty && state.tour && (
+            <IconButton icon="undo" variant="ghost" label={t('discard')} onClick={() => void discard()} disabled={saving || deleting} />
+          )}
+          {!isNew && (
+            <IconButton
+              icon="content_copy"
+              variant="ghost"
+              label={t('duplicate')}
+              onClick={() => router.push(`/admin/tours/new?duplicate=${id}`)}
+              disabled={saving || deleting}
+            />
+          )}
           {!isNew && (
             <IconButton icon="delete" variant="danger" label={t('delete')} onClick={() => void remove()} disabled={deleting} />
           )}

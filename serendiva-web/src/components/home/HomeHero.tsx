@@ -11,14 +11,16 @@ import { loadSection } from './loadSection'
 import { QuickInquiryBar, type QuickInquiryOption, type QuickInquiryPartyOption } from './QuickInquiryBar'
 import { formatWindowMonth, upcomingTravelWindows } from './travelWindows'
 
-/** Party presets of the Stitch "Private Party Size" select → /contact `party` + `adults`. */
-const PARTY_PRESETS: readonly { party: Extract<PartyType, 'couple' | 'family' | 'group' | 'solo'>; adults: number }[] =
-  [
-    { party: 'couple', adults: 2 },
-    { party: 'family', adults: 4 },
-    { party: 'group', adults: 7 },
-    { party: 'solo', adults: 1 },
-  ]
+/**
+ * Party choices of the Stitch "Private Party Size" select → /contact `party` (the wizard then asks the real guest
+ * counts — no invented numbers are sent).
+ */
+const PARTY_PRESETS: readonly { party: Extract<PartyType, 'couple' | 'family' | 'group' | 'solo'> }[] = [
+  { party: 'couple' },
+  { party: 'family' },
+  { party: 'group' },
+  { party: 'solo' },
+]
 
 /** Quick-inquiry bar with its options (categories come from the API; month windows are computed per request). */
 async function HeroInquiry({ locale, today }: { locale: Locale; today: Date }) {
@@ -30,12 +32,13 @@ async function HeroInquiry({ locale, today }: { locale: Locale; today: Date }) {
     { value: '', label: t('focusOpen') },
   ]
 
-  // Values are what /contact understands ('YYYY-MM' of the window's first month, or 'flexible'), so the inquiry
-  // wizard pre-selects the matching travel window; the labels stay human.
+  // Values are what /contact understands (the window's month range 'YYYY-MM/YYYY-MM', or 'flexible'), so the
+  // inquiry wizard pre-selects exactly this window; the labels stay human.
   const windowOptions: QuickInquiryOption[] = upcomingTravelWindows(today).map((w) => {
     const window = t('window', { start: formatWindowMonth(w.start, locale), end: formatWindowMonth(w.end, locale) })
     return {
-      value: w.start.toISOString().slice(0, 7),
+      // the whole window ("2027-02/2027-04"): the wizard shows exactly this range
+      value: `${w.start.toISOString().slice(0, 7)}/${w.end.toISOString().slice(0, 7)}`,
       label: w.note ? t('windowWithNote', { window, note: t(`notes.${w.note}`) }) : window,
     }
   })

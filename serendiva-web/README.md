@@ -81,7 +81,7 @@ never put secrets in them.
 | `REVALIDATE_SECRET` | 32+ random chars | Shared with the API. Protects `POST /api/revalidate`. |
 | `NEXT_PUBLIC_WHATSAPP_NUMBER` | `94771234567` | Fallback WhatsApp number (digits only) if the CMS has none. |
 | `NEXT_PUBLIC_ENABLED_LOCALES` | `en` or `en,zh,de` | Languages offered in the switcher. Others show "coming soon". |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | *(empty)* | Optional Cloudflare Turnstile on forms (pair with the API's `TURNSTILE_SECRET`). |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | *(empty)* | Optional Cloudflare Turnstile on forms (pair with the API's `TURNSTILE_SECRET`; the widget's hostnames are this website's domains). Local test key: `1x00000000000000000000AA` (always passes — never in production). |
 | `CONTENT_FALLBACK` | `false` | `true` = serve the deprecated `src/content` snapshot when the API is down (always on in `npm run dev`). |
 | `IMAGE_REMOTE_HOSTS` | `media.serendiva.com` | Extra image hostnames for `next/image` (e.g. your R2/S3 public bucket domain). |
 | `PLAYWRIGHT_BASE_URL`, `PW_CHROMIUM_PATH` | | E2E test target / custom Chromium. |

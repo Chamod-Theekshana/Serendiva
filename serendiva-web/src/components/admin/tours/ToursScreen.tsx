@@ -426,6 +426,14 @@ function TourRow({
       >
         <Icon name="edit" className="text-[18px]" />
       </NextLink>
+      <NextLink
+        href={`/admin/tours/new?duplicate=${tour.id}`}
+        aria-label={t('duplicate', { title: tour.title })}
+        title={t('duplicateShort')}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <Icon name="content_copy" className="text-[18px]" />
+      </NextLink>
       <IconButton icon="delete" size="sm" variant="danger" label={t('delete', { title: tour.title })} onClick={onDelete} disabled={busy} />
     </span>
   )

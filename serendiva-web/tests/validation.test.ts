@@ -4,6 +4,7 @@ import { msg, parseValidationMessage } from '@/lib/validation/messages'
 import { newsletterSchema } from '@/lib/validation/newsletter'
 import { PROPOSAL_MAX_FILE_BYTES, proposalSchema } from '@/lib/validation/proposal'
 import { reviewSchema } from '@/lib/validation/review'
+import { optionalIntlPhone, optionalPhone, requiredIntlPhone, requiredPhone } from '@/lib/validation/shared'
 
 const firstError = (
   result: { success: boolean; error?: { issues: { path: PropertyKey[]; message: string }[] } },
@@ -50,6 +51,7 @@ describe('inquiry schema', () => {
 
   it('validates phone numbers and slugs', () => {
     expect(firstError(inquirySchema.safeParse({ ...valid, whatsapp: 'call me' }), 'whatsapp')).toBe('phone')
+    expect(firstError(inquirySchema.safeParse({ ...valid, whatsapp: '+ ()-.-' }), 'whatsapp')).toBe('phone')
     expect(
       inquirySchema.safeParse({ ...valid, whatsapp: '+44 7911 123456', tourSlug: 'cultural-odyssey' }).success,
     ).toBe(true)
@@ -148,5 +150,14 @@ describe('validation messages', () => {
     expect(parseValidationMessage('email')).toEqual({ key: 'email', values: {} })
     expect(parseValidationMessage('Invalid email (from the API)')).toBeNull()
     expect(msg('tooMany', 20)).toBe('tooMany:20')
+  })
+
+  it('rejects punctuation-only phone inputs with fewer than 5 digits', () => {
+    for (const bad of ['-----', '+ --- ()', '1234', '+(12)-']) {
+      expect(optionalPhone().safeParse(bad).success).toBe(false)
+      expect(requiredPhone().safeParse(bad).success).toBe(false)
+      expect(optionalIntlPhone().safeParse(bad).success).toBe(false)
+      expect(requiredIntlPhone().safeParse(bad).success).toBe(false)
+    }
   })
 })

@@ -6,7 +6,7 @@ import {
   honeypot,
   localeSchema,
   optionalIsoDate,
-  optionalPhone,
+  optionalIntlPhone,
   optionalSlug,
   optionalText,
   requiredText,
@@ -23,7 +23,7 @@ export const inquirySchema = z
   .object({
     name: requiredText(120, 2, 'nameTooShort'),
     email: emailSchema,
-    whatsapp: optionalPhone(40),
+    whatsapp: optionalIntlPhone(40),
     country: optionalText(80),
     partyType: z.enum(TRAVELLER_TYPES).optional(),
     adults: z.number({ error: 'required' }).int('integer').min(1, msg('min', 1)).max(50, msg('max', 50)),

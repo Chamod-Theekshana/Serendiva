@@ -1,7 +1,7 @@
 import { Fragment } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { breadcrumbListJsonLd } from '@/components/seo/jsonld'
-import { JsonLd } from '@/components/seo/JsonLd'
+import { JsonLd } from '@/components/seo/JsonLdScript'
 import { Icon } from '@/components/ui/Icon'
 import { Link } from '@/i18n/navigation'
 import type { Locale } from '@/i18n/routing'

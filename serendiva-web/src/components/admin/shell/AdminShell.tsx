@@ -196,10 +196,53 @@ function ShellFrame({ children }: { children: ReactNode }) {
       </header>
 
       <main id="admin-main" tabIndex={-1} className="mx-auto w-full max-w-[1400px] px-4 pb-16 pt-5 focus:outline-none md:px-6 lg:px-8 lg:pt-7">
+        <EmailAlertBanner />
         {children}
       </main>
 
       <MobileNav open={menuOpen} onClose={() => setMenuOpen(false)} />
+    </div>
+  )
+}
+
+/**
+ * Red banner on every admin page while some leads never reached the guide's inbox (notification email failed
+ * for good, e.g. a revoked Gmail App Password): the guide may not know these people are waiting for a reply.
+ */
+function EmailAlertBanner() {
+  const t = useTranslations('admin.emailAlert')
+  const { stats } = useAdminSession()
+  const inquiries = stats?.emailAlerts?.inquiries ?? 0
+  const proposals = stats?.emailAlerts?.proposals ?? 0
+  if (inquiries + proposals === 0) return null
+  return (
+    <div
+      role="alert"
+      className="mb-5 flex flex-col gap-2 rounded-xl bg-error-container px-4 py-3 text-on-error-container md:flex-row md:items-center md:gap-4"
+    >
+      <Icon name="mail_lock" className="hidden text-[24px] md:block" />
+      <div className="flex-1">
+        <p className="font-semibold">{t('title', { count: inquiries + proposals })}</p>
+        <p className="font-caption text-caption">{t('body')}</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {inquiries > 0 && (
+          <NextLink
+            href="/admin/inquiries?guideEmail=missing"
+            className="rounded-lg bg-surface-container-lowest px-3 py-1.5 font-label-md text-label-md text-error hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {t('inquiries', { count: inquiries })}
+          </NextLink>
+        )}
+        {proposals > 0 && (
+          <NextLink
+            href="/admin/proposals?guideEmail=missing"
+            className="rounded-lg bg-surface-container-lowest px-3 py-1.5 font-label-md text-label-md text-error hover:bg-surface-container focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {t('proposals', { count: proposals })}
+          </NextLink>
+        )}
+      </div>
     </div>
   )
 }

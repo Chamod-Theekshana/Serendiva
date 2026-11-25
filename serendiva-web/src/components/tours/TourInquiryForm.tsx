@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useLocale, useTranslations } from 'next-intl'
 import { applyFieldErrors, submitInquiry } from '@/lib/api/forms'
-import type { Locale } from '@/lib/api/types'
+import { useSubmissionId } from '@/components/forms/useSubmissionId'
+import type { InquiryBody, Locale } from '@/lib/api/types'
 import { FormStatus, useFormFailureMessage, type FormStatusState } from '@/components/forms/FormStatus'
+import { WhatsAppFallback } from '@/components/forms/WhatsAppFallback'
 import { Honeypot } from '@/components/forms/Honeypot'
 import { Turnstile } from '@/components/forms/Turnstile'
 import { WhatsAppLink } from '@/components/layout/WhatsAppLink'
@@ -15,7 +17,8 @@ import { Field, Input, Select, Textarea } from '@/components/ui/Field'
 import { Icon } from '@/components/ui/Icon'
 import {
   FLEXIBLE_MONTH,
-  GUEST_OPTIONS,
+  ADULT_COUNTS,
+  CHILD_COUNTS,
   mapInquiryFieldErrors,
   TOUR_INQUIRY_FIELDS,
   tourInquiryDefaults,
@@ -45,6 +48,9 @@ export function TourInquiryForm({ tourSlug, tourTitle, months }: TourInquiryForm
   const failureMessage = useFormFailureMessage()
   const hydrated = useHydrated()
   const [status, setStatus] = useState<FormStatusState>(null)
+  /** Body that could not be sent (network / server / rate limit) → offered as a WhatsApp message. */
+  const [unsent, setUnsent] = useState<InquiryBody | null>(null)
+  const [attempts, setAttempts] = useState(0)
   const successRef = useRef<HTMLDivElement>(null)
   const succeeded = status?.kind === 'success'
   useEffect(() => {
@@ -63,8 +69,12 @@ export function TourInquiryForm({ tourSlug, tourTitle, months }: TourInquiryForm
     defaultValues: tourInquiryDefaults(),
   })
 
+  const submission = useSubmissionId()
+  const sending = useRef(false)
+
   const onSubmit = async (values: TourInquiryValues) => {
     setStatus(null)
+    setUnsent(null)
     const body = toTourInquiryBody(values, {
       tourSlug,
       locale,
@@ -72,8 +82,10 @@ export function TourInquiryForm({ tourSlug, tourTitle, months }: TourInquiryForm
       monthLabel: months.find((m) => m.value === values.month)?.label,
       flexibleLabel: t('flexibleWindow'),
     })
-    const result = await submitInquiry(body)
+    const result = await submitInquiry({ ...body, clientRequestId: submission.current() })
+    setAttempts((n) => n + 1)
     if (result.ok) {
+      submission.renew()
       setStatus({
         kind: 'success',
         title: t('successTitle', { tour: tourTitle }),
@@ -88,6 +100,18 @@ export function TourInquiryForm({ tourSlug, tourTitle, months }: TourInquiryForm
       return
     }
     setStatus({ kind: 'error', message: failureMessage(result) })
+    if (result.kind !== 'validation') setUnsent(body)
+  }
+
+  const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (sending.current) {
+      event.preventDefault()
+      return
+    }
+    sending.current = true
+    void handleSubmit(onSubmit)(event).finally(() => {
+      sending.current = false
+    })
   }
 
   const whatsapp = (
@@ -119,7 +143,7 @@ export function TourInquiryForm({ tourSlug, tourTitle, months }: TourInquiryForm
     <form
       noValidate
       data-hydrated={hydrated || undefined}
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleFormSubmit}
       aria-labelledby="tour-inquiry-title"
       className="relative flex flex-col gap-space-md"
     >
@@ -143,7 +167,7 @@ export function TourInquiryForm({ tourSlug, tourTitle, months }: TourInquiryForm
           {...register('email')}
         />
       </Field>
-      <Field label={tc('form.labels.whatsapp')} required error={errors.whatsapp?.message}>
+      <Field label={tc('form.labels.whatsapp')} hint={tc('form.whatsappOptional')} error={errors.whatsapp?.message}>
         <Input
           type="tel"
           inputMode="tel"
@@ -152,23 +176,32 @@ export function TourInquiryForm({ tourSlug, tourTitle, months }: TourInquiryForm
           {...register('whatsapp')}
         />
       </Field>
-      <div className="grid grid-cols-2 gap-space-sm lg:grid-cols-1 xl:grid-cols-2">
-        <Field label={tc('form.labels.travelMonth')} error={errors.month?.message}>
-          <Select className="px-space-sm" {...register('month')}>
-            <option value="">{t('monthPlaceholder')}</option>
-            {months.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
+      <Field label={tc('form.labels.travelMonth')} error={errors.month?.message}>
+        <Select className="px-space-sm" {...register('month')}>
+          <option value="">{t('monthPlaceholder')}</option>
+          {months.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+          <option value={FLEXIBLE_MONTH}>{t('flexible')}</option>
+        </Select>
+      </Field>
+      <div className="grid grid-cols-2 gap-space-sm">
+        <Field label={tc('form.labels.adults')} error={errors.adults?.message}>
+          <Select className="px-space-sm" {...register('adults')}>
+            {ADULT_COUNTS.map((n) => (
+              <option key={n} value={n}>
+                {n}
               </option>
             ))}
-            <option value={FLEXIBLE_MONTH}>{t('flexible')}</option>
           </Select>
         </Field>
-        <Field label={tc('form.labels.guests')} error={errors.guests?.message}>
-          <Select className="px-space-sm" {...register('guests')}>
-            {GUEST_OPTIONS.map((g) => (
-              <option key={g} value={g}>
-                {t(`guests.${g}`)}
+        <Field label={tc('form.labels.children')} error={errors.children?.message}>
+          <Select className="px-space-sm" {...register('children')}>
+            {CHILD_COUNTS.map((n) => (
+              <option key={n} value={n}>
+                {n}
               </option>
             ))}
           </Select>
@@ -179,11 +212,12 @@ export function TourInquiryForm({ tourSlug, tourTitle, months }: TourInquiryForm
       </Field>
 
       <Honeypot {...register('website')} />
-      <Turnstile onToken={(token) => setValue('turnstileToken', token)} action="tour-inquiry" />
+      <Turnstile onToken={(token) => setValue('turnstileToken', token)} action="tour-inquiry" resetKey={attempts} />
 
       {(status?.kind === 'error' || serverError) && (
         <FormStatus state={status ?? { kind: 'error', message: serverError }} />
       )}
+      {status?.kind === 'error' && unsent && <WhatsAppFallback inquiry={unsent} about={tourTitle} />}
 
       <Button
         type="submit"

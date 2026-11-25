@@ -134,7 +134,10 @@
     "lead": {
       "new": "New",
       "replied": "Replied",
-      "closed": "Closed"
+      "proposal_sent": "Proposal sent",
+      "confirmed": "Confirmed",
+      "lost": "Lost",
+      "cancelled": "Cancelled"
     },
     "content": {
       "draft": "Draft",
@@ -415,7 +418,7 @@
       "thisMonth": "This month",
       "thisMonthHint": "Inquiries since the 1st",
       "conversion": "Reply rate",
-      "conversionHint": "Inquiries replied to or closed",
+      "conversionHint": "Inquiries replied to or confirmed",
       "newProposals": "New proposals",
       "newProposalsHint": "{total, plural, one {of # corporate request} other {of # corporate requests}}",
       "pendingReviews": "Pending reviews",
@@ -423,7 +426,7 @@
       "newsletter": "Newsletter",
       "newsletterHint": "{pending, plural, =0 {confirmed subscribers} one {confirmed · # unconfirmed} other {confirmed · # unconfirmed}}",
       "total": "All inquiries",
-      "totalHint": "{replied} replied · {closed} closed"
+      "totalHint": "{confirmed} confirmed · {replied} in progress"
     },
     "byMonth": "Inquiries by month",
     "byMonthHint": "Last 12 months",
@@ -450,24 +453,42 @@
       "all": "All",
       "new": "New",
       "replied": "Replied",
-      "closed": "Closed"
+      "proposal_sent": "Proposal sent",
+      "confirmed": "Confirmed",
+      "lost": "Lost",
+      "cancelled": "Cancelled"
     },
     "statusLabel": {
       "new": "New",
       "replied": "Replied",
-      "closed": "Closed"
+      "proposal_sent": "Proposal sent",
+      "confirmed": "Confirmed",
+      "lost": "Lost",
+      "cancelled": "Cancelled"
     },
     "statusGroup": "Change status",
     "statusChanged": "Status changed to {status}",
     "markRepliedPrompt": "Replied to this lead?",
     "markReplied": "Mark as replied",
+    "overdue": "Reply overdue",
+    "followUpBadge": "Follow-up: {date}",
+    "bookedBadge": "Booked: {range}",
+    "dueReplyFilter": "Showing leads still marked “New” past your response target.",
+    "dueFollowUpFilter": "Showing leads with a follow-up reminder due today or earlier.",
     "filters": {
       "search": "Search",
       "received": "Received",
       "tour": "Tour",
       "allTours": "All tours",
       "country": "Country",
-      "countryPlaceholder": "Any country"
+      "countryPlaceholder": "Any country",
+      "due": "Attention",
+      "dueAll": "All leads",
+      "dueReply": "Reply overdue",
+      "dueFollowUp": "Follow-up due",
+      "sort": "Order",
+      "sortNewest": "Newest first",
+      "sortOldest": "Oldest first"
     },
     "columns": {
       "guest": "Guest",
@@ -511,11 +532,15 @@
     },
     "sections": {
       "status": "Status",
+      "followUp": "Follow-up reminder",
+      "booking": "Confirmed dates & calendar",
+      "contactLog": "Log a contact",
       "trip": "Trip",
       "guests": "Guests",
       "contact": "Contact",
       "message": "Message",
       "notes": "Internal notes",
+      "history": "Activity history",
       "emails": "Email delivery",
       "record": "Record"
     },
@@ -536,7 +561,62 @@
       "sourcePage": "Sent from page",
       "language": "Language",
       "created": "Received",
-      "updated": "Last updated"
+      "updated": "Last updated",
+      "repliedAt": "First replied",
+      "confirmedAt": "Confirmed",
+      "lastContactAt": "Last contact"
+    },
+    "lostReason": {
+      "label": "Reason (optional)",
+      "placeholder": "e.g. Chose another destination, dates clashed, price…",
+      "save": "Save reason",
+      "saved": "Reason saved"
+    },
+    "followUp": {
+      "date": "Next follow-up date",
+      "hint": "Cleared automatically if the lead is marked Lost or Cancelled.",
+      "save": "Set reminder",
+      "clear": "Clear",
+      "saved": "Follow-up reminder set",
+      "cleared": "Follow-up reminder cleared"
+    },
+    "booking": {
+      "start": "Confirmed arrival",
+      "end": "Confirmed departure",
+      "blockCalendar": "Block these dates on the public availability calendar",
+      "blockCalendarHint": "Shows as Busy on the website while this inquiry is Confirmed.",
+      "confirmHint": "Mark this inquiry as Confirmed to block these dates on your calendar automatically.",
+      "blockedRange": "Calendar blocked for {range}",
+      "save": "Save dates",
+      "clear": "Clear dates",
+      "saved": "Booked dates saved",
+      "cleared": "Booked dates cleared",
+      "datesError": "Enter both arrival and departure dates, with departure on or after arrival."
+    },
+    "logContact": {
+      "channel": "Channel",
+      "note": "Summary (optional)",
+      "notePlaceholder": "e.g. Sent revised 10-day itinerary and quote",
+      "submit": "Log contact",
+      "saved": "Contact logged",
+      "channels": {
+        "whatsapp": "WhatsApp",
+        "email": "Email",
+        "phone": "Phone call",
+        "meeting": "Video / meeting",
+        "other": "Other"
+      }
+    },
+    "history": {
+      "empty": "No activity logged yet.",
+      "statusChanged": "Status: {from} → {to}",
+      "statusChangedReason": "Status: {from} → {to} ({reason})",
+      "noteSaved": "Internal notes updated",
+      "contactLogged": "Contacted via {details}",
+      "followUpSet": "Follow-up scheduled for {date}",
+      "followUpCleared": "Follow-up reminder cleared",
+      "bookingUpdated": "Booking: {details}",
+      "byActor": "by {actor}"
     },
     "notesPlaceholder": "Private notes — only visible in the admin (call notes, preferences, quotes…).",
     "notesHint": "Only visible to you. Ctrl+Enter saves.",
@@ -568,7 +648,9 @@
     "deleteBody": "{name} will be removed permanently. This cannot be undone.",
     "deleted": "Deleted",
     "notFoundTitle": "Not found",
-    "notFoundBody": "This lead doesn't exist any more — it may have been deleted."
+    "notFoundBody": "This lead doesn't exist any more — it may have been deleted.",
+    "emailProblem": "Email not delivered",
+    "guideEmailFilter": "Showing inquiries whose notification email never reached you."
   },
   "inquiries": {
     "title": "Inquiries",
@@ -576,7 +658,68 @@
     "searchPlaceholder": "Name, email, reference or message",
     "tableCaption": "Travel inquiries",
     "emptyTitle": "No inquiries yet",
-    "emptyBody": "When someone sends the inquiry form on the website, it appears here and you get an email."
+    "emptyBody": "When someone sends the inquiry form on the website, it appears here and you get an email.",
+    "create": {
+      "openButton": "Log inquiry",
+      "title": "Log manual inquiry or booking",
+      "subtitle": "Record a direct WhatsApp, phone or referral request so it gets an SRD reference, reminders and calendar sync.",
+      "submit": "Save inquiry",
+      "cancel": "Cancel",
+      "created": "Saved as {reference}",
+      "sections": {
+        "guest": "Guest & channel",
+        "trip": "Trip & guests",
+        "status": "Status & calendar",
+        "notes": "Notes"
+      },
+      "fields": {
+        "name": "Guest name",
+        "namePlaceholder": "e.g. Emma Watson",
+        "channel": "How they contacted you",
+        "whatsapp": "WhatsApp / phone",
+        "whatsappPlaceholder": "+44 7700 900123",
+        "email": "Email address",
+        "emailPlaceholder": "guest@example.com",
+        "country": "Country",
+        "countryPlaceholder": "e.g. United Kingdom",
+        "partyType": "Travelling as",
+        "partyPlaceholder": "Not specified",
+        "adults": "Adults",
+        "children": "Children",
+        "tour": "Tour blueprint",
+        "destination": "Destination",
+        "anyDestination": "Not specified",
+        "travelStart": "Travel arrival",
+        "travelEnd": "Travel departure",
+        "travelWindow": "Travel window / timing",
+        "travelWindowPlaceholder": "e.g. January 2027 (flexible)",
+        "status": "Initial status",
+        "followUpAt": "Follow-up reminder",
+        "bookedStart": "Confirmed arrival",
+        "bookedEnd": "Confirmed departure",
+        "bookedHint": "Leave blank to reuse the travel arrival & departure dates above.",
+        "blockCalendar": "Block these dates on the public availability calendar",
+        "blockCalendarHint": "Shows as Busy on the website while this booking is Confirmed.",
+        "message": "What the guest asked for",
+        "messagePlaceholder": "Highlights, hotels, special occasions…",
+        "internalNotes": "Private internal notes",
+        "internalNotesPlaceholder": "Quote sent, driver/vehicle notes…"
+      },
+      "channels": {
+        "whatsapp": "WhatsApp",
+        "phone": "Phone call",
+        "email": "Direct email",
+        "referral": "Referral / agent",
+        "other": "Other"
+      },
+      "errors": {
+        "nameTooShort": "Enter the guest’s name (at least 2 characters).",
+        "contactRequired": "Enter at least an email address or WhatsApp number.",
+        "emailInvalid": "Enter a valid email address.",
+        "datesOrder": "Departure date must be on or after arrival date.",
+        "bookedDates": "Enter both confirmed arrival and departure dates, with departure on or after arrival."
+      }
+    }
   },
   "proposals": {
     "title": "Corporate Proposals",
@@ -585,6 +728,7 @@
     "tableCaption": "Corporate proposal requests",
     "emptyTitle": "No proposal requests yet",
     "emptyBody": "Requests sent from the corporate page appear here.",
+    "guideEmailFilter": "Showing corporate proposals whose notification email never reached you.",
     "hasAttachment": "Has an attached brief",
     "noAttachment": "No file was attached.",
     "download": "Download",
@@ -610,5 +754,11 @@
       "eventType": "Event type",
       "logistics": "Logistics"
     }
+  },
+  "emailAlert": {
+    "title": "{count, plural, one {# lead never reached your inbox} other {# leads never reached your inbox}}",
+    "body": "The notification email to you failed (check the email settings, e.g. the Gmail App Password). These visitors are waiting for your reply — open them and answer on WhatsApp or by email.",
+    "inquiries": "{count, plural, one {# inquiry} other {# inquiries}}",
+    "proposals": "{count, plural, one {# corporate proposal} other {# corporate proposals}}"
   }
 }

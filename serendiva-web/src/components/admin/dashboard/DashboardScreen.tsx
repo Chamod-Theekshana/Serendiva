@@ -125,7 +125,10 @@ function DashboardContent({ stats, onOpenInquiry }: { stats: AdminStats; onOpenI
           label={t('stats.total')}
           value={n(inquiries.total)}
           icon="inbox"
-          hint={t('stats.totalHint', { replied: inquiries.byStatus.replied, closed: inquiries.byStatus.closed })}
+          hint={t('stats.totalHint', {
+            confirmed: inquiries.byStatus.confirmed,
+            replied: inquiries.byStatus.replied + inquiries.byStatus.proposal_sent,
+          })}
         />
       </section>
 

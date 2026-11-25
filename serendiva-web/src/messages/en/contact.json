@@ -24,6 +24,7 @@
     "about": "About: {title}",
     "aboutRemove": "Remove “{title}” from this inquiry",
     "draftRestored": "I restored the answers you started earlier.",
+    "draftClear": "Start fresh",
     "steps": {
       "party": "Who is Travelling?",
       "dates": "Dates & Pace",
@@ -61,6 +62,11 @@
       "guestsBody": "Used to secure luxury seating configurations and vehicle types.",
       "adults": "Adults",
       "children": "Children",
+      "childAges": "Children’s ages",
+      "childAgesPlaceholder": "e.g. 4 and 9",
+      "childAgesHint": "Helps me plan car seats, safari age limits and family rooms.",
+      "corporateNote": "Planning a company retreat, MICE event, or multi-vehicle delegation with an RFP?",
+      "corporateLink": "Use the dedicated Corporate Proposal form",
       "next": "Continue to Dates & Pace"
     },
     "dates": {
@@ -68,6 +74,15 @@
       "title": "When are you hoping to visit Ceylon?",
       "intro": "Sri Lanka enjoys dual monsoon microclimates; I align your destinations with optimal coastal sunshine and dry highland valleys.",
       "windowLabel": "Estimated Travel Window",
+      "windowPlaceholder": "Choose when you’d like to travel",
+      "arrival": "Arrival date",
+      "departure": "Departure date",
+      "busyWarning": "I’m already guiding on some of these days. Send your request anyway — I’ll suggest the closest free dates or a trusted colleague.",
+      "calendarToggleShow": "Check my availability & pick dates",
+      "calendarToggleHide": "Hide availability calendar",
+      "calendarSelectionEmpty": "Tap an arrival date, then a departure date — I’ll fill them in for you above.",
+      "calendarSelectionStart": "Arrival set to {start} — now tap your departure date.",
+      "calendarSelectionRange": "Selected: {start} to {end}",
       "flexibilityLabel": "Flexibility Level",
       "windows": {
         "immediate": "Immediate (Next 30–60 Days)",
@@ -78,13 +93,16 @@
           "jun": "East Coast Sun & Minneriya Gathering",
           "sep": "Cultural Harvests"
         },
-        "later": "From {month} Onwards — Bespoke Planning"
+        "later": "From {month} Onwards — Bespoke Planning",
+        "flexible": "Flexible / Undecided — recommend the best season"
       },
       "flexibility": {
         "completely": "Completely flexible (seeking optimal seasonal weather)",
         "days": "Flexible within +/- 3 to 5 days",
         "fixed": "Fixed exact dates (flights already held)"
       },
+      "exactDurationBadge": "Trip length: {days} days / {nights} nights (calculated from your dates)",
+      "exactDurationValue": "{days} days ({nights} nights)",
       "durationLabel": "Preferred Duration",
       "durations": {
         "short": {
@@ -121,6 +139,10 @@
         "active": {
           "title": "Active & Immersive",
           "body": "Dawn bird walks, mountain treks, multiple safari drives, and high-frequency cultural immersion."
+        },
+        "undecided": {
+          "title": "No preference yet",
+          "body": "I’ll suggest a rhythm that suits your party and the route."
         }
       },
       "next": "Continue to Passions & Stays"
@@ -141,6 +163,15 @@
         "hiking": "Waterfalls & Ridge Treks",
         "photography": "Birding & Photography"
       },
+      "tourLabel": "Based on a curated journey? (Optional)",
+      "tourPlaceholder": "Design from scratch (no fixed tour)",
+      "tourOption": "{title} ({days} days)",
+      "destinationsLabel": "Must-visit places (Optional)",
+      "destinationsField": "Must-visit destinations",
+      "destinationsShow": "Pick destinations ({count} selected)",
+      "destinationsShowNone": "Browse & pick destinations",
+      "destinationsHide": "Done picking destinations",
+      "destinationsEmpty": "All destinations are optional — pick places you already have in mind.",
       "stayLabel": "Boutique Stay Aesthetic",
       "stays": {
         "bungalows": {
@@ -158,6 +189,33 @@
         "blend": {
           "title": "Curated Blend of Unique Villas",
           "body": "A handpicked progression transitioning smoothly from tea country to coastal sanctuaries."
+        },
+        "undecided": {
+          "title": "No preference yet",
+          "body": "I’ll suggest a mix that fits your interests."
+        }
+      },
+      "budgetLabel": "Comfort & Budget Tier (Optional)",
+      "budgets": {
+        "comfortable": {
+          "title": "Thoughtful Comfort",
+          "body": "Handpicked 3–4★ boutique stays & character guesthouses ($180–$280 / day per couple)."
+        },
+        "boutique": {
+          "title": "Curated Boutique",
+          "body": "Heritage planter bungalows & intimate design hideaways ($280–$480 / day per couple)."
+        },
+        "luxury": {
+          "title": "Luxury Sanctuaries",
+          "body": "Relais & Châteaux estates, Resplendent Ceylon & flagship retreats ($480–$850 / day)."
+        },
+        "ultra": {
+          "title": "Ultra-Bespoke & Seaplane",
+          "body": "Top suites, private villa buyouts & chartered flights ($850+ / day)."
+        },
+        "undecided": {
+          "title": "Open / Recommend",
+          "body": "Let’s match properties to the best locations along the route."
         }
       },
       "next": "Final Step: Your Details"
@@ -174,18 +232,44 @@
       "whatsappCode": "Country calling code",
       "whatsappPlaceholder": "7700 900123",
       "whatsappOtherHint": "Please include your country code, e.g. +353 85 123 4567.",
+      "whatsappOptionalHint": "Optional — but I usually reply fastest on WhatsApp.",
+      "whatsappRequiredHint": "Required since you chose this as your preferred reply channel.",
+      "preferredContactLabel": "How would you prefer I reply first?",
+      "contactMethods": {
+        "any": "Either WhatsApp or Email",
+        "whatsapp": "WhatsApp message",
+        "email": "Detailed email",
+        "call": "Phone / WhatsApp call"
+      },
       "codes": {
         "gb": "+44 UK",
         "us": "+1 US",
         "au": "+61 AU",
+        "nz": "+64 NZ",
         "de": "+49 DE",
-        "fr": "+33 FR",
+        "at": "+43 AT",
         "ch": "+41 CH",
+        "fr": "+33 FR",
+        "be": "+32 BE",
         "nl": "+31 NL",
+        "it": "+39 IT",
+        "es": "+34 ES",
+        "se": "+46 SE",
+        "no": "+47 NO",
+        "dk": "+45 DK",
+        "pl": "+48 PL",
+        "ru": "+7 RU",
         "cn": "+86 CN",
-        "ae": "+971 UAE",
+        "hk": "+852 HK",
+        "jp": "+81 JP",
+        "kr": "+82 KR",
         "sg": "+65 SG",
+        "my": "+60 MY",
         "in": "+91 IN",
+        "ae": "+971 UAE",
+        "sa": "+966 SA",
+        "qa": "+974 QA",
+        "za": "+27 ZA",
         "lk": "+94 LK",
         "other": "Other"
       },
@@ -195,17 +279,32 @@
       "messagePlaceholder": "Mention any milestone anniversaries, special dietary preferences (gluten-free, vegan, halal), architectural passions (Geoffrey Bawa fans), or specific national parks you wish to prioritize...",
       "guaranteeTitle": "No Payment, No Obligation · 100% Bespoke Consultation",
       "guaranteeBody": "Nothing is paid or booked through this website. I design your itinerary blueprint personally and refine it with you, free of any commitment, until you are thrilled.",
+      "summaryTitle": "Review your trip notes",
+      "summaryEdit": "Edit",
+      "summaryParty": "Party & guests",
+      "summaryTiming": "Timing & rhythm",
+      "summaryStyle": "Route, style & interests",
+      "summaryNone": "Not specified",
+      "privacyBefore": "By requesting your blueprint, you agree we’ll use these details solely to plan your journey under our ",
+      "privacyLink": "Privacy Policy",
+      "privacyAfter": ".",
       "back": "Back to Passions",
       "submit": "Request My Personalized Trip Blueprint",
-      "submitting": "Sending your request…"
+      "submitting": "Sending your request…",
+      "whatsappPreview": "I’ll message you on WhatsApp at {number} — please check the country code."
     },
     "success": {
       "title": "Ayubowan! Your Blueprint Request is Received.",
       "body": "I am reviewing your travel preferences now. Expect a customized blueprint in your inbox and a brief hello on WhatsApp within 24 hours.",
+      "bodyEmailOnly": "I am reviewing your travel preferences now. Expect a customized blueprint in your inbox within 24 hours.",
+      "sentTo": "Confirmation sent to {email}",
       "referenceLabel": "Your inquiry reference",
       "referenceHint": "Please mention it when we talk — it helps me find your notes instantly.",
+      "copyReference": "Copy reference",
+      "copiedReference": "Copied!",
       "whatsappLead": "Need immediate answers? Message me directly at",
       "whatsappMessage": "Hello {name}, I have just sent my trip inquiry (reference {reference}) and would love to chat.",
+      "whatsappMessageNoName": "Hello, I have just sent my trip inquiry (reference {reference}) and would love to chat.",
       "again": "Start a new inquiry"
     }
   },
@@ -243,6 +342,9 @@
     "base": "Primary Base: {area}",
     "photoQuote": "“Sri Lanka is not a trip; it is an enduring memory.”",
     "availabilityTitle": "My Availability",
+    "availabilityPickHint": "Tap dates to fill Step 2 automatically.",
+    "availabilityPickEnd": "Arrival: {start} — tap departure.",
+    "availabilityRange": "{start} → {end}",
     "unavailable": "My contact details couldn't be loaded right now — WhatsApp and email still reach me."
   },
   "process": {

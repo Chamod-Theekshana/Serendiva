@@ -21,7 +21,8 @@ export interface InquirySidebarCardProps {
 
 /**
  * Sticky teal-header inquiry card from the tour/destination detail pages. The page positions it
- * (`lg:col-span-4 lg:sticky lg:top-36`); the form body is passed as children.
+ * (`lg:col-span-4 lg:sticky lg:top-36`); the form body is passed as children. `scroll-mt-40` clears the sticky
+ * header + tour sub-nav when the site-wide "Inquire" buttons jump to it (#tour-inquiry).
  */
 export function InquirySidebarCard({
   eyebrow,
@@ -39,7 +40,7 @@ export function InquirySidebarCard({
     <section
       id={id}
       aria-labelledby={id ? `${id}-title` : undefined}
-      className={cn('overflow-hidden rounded-xl bg-surface-container shadow-xl', className)}
+      className={cn('scroll-mt-40 overflow-hidden rounded-xl bg-surface-container shadow-xl', className)}
     >
       <div className="bg-primary p-space-md text-on-primary">
         <span className="mb-1 block font-label-md text-label-md uppercase tracking-widest text-primary-fixed">

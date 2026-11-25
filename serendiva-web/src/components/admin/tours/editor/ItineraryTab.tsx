@@ -13,7 +13,7 @@ import { Icon } from '@/components/ui/Icon'
 import { toast } from '@/lib/admin/toast'
 import { cn } from '@/lib/utils'
 import { EditorSection, TranslatedRepeater } from './fields'
-import { LIMITS, newDay, newDetail, newStop, type DayForm, type LabelValueForm, type StopForm } from './model'
+import { buildRemainingDays, LIMITS, newDay, newDetail, newStop, type DayForm, type LabelValueForm, type StopForm } from './model'
 import { asL, type EditorTabProps } from './types'
 
 /** "7.1808, 79.8841" / "7.1808 79.8841" / "(7.18,79.88)" → { lat, lng } (null when it doesn't look like a pair). */
@@ -69,6 +69,23 @@ export function ItineraryTab({ form, locale, errors, update, expandToken }: Edit
             }}
           >
             {t('syncDuration', { count: days.length })}
+          </Button>
+        </div>
+      )}
+      {form.durationDays !== null && form.durationDays >= LIMITS.duration.min && form.durationDays <= LIMITS.days && days.length < form.durationDays && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-container-low px-4 py-2.5">
+          <span className="font-caption text-caption text-on-surface-variant">
+            {t('dayCount', { count: days.length })}
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="playlist_add"
+            onClick={() => update('days', buildRemainingDays(days, form.durationDays!), ['days'])}
+          >
+            {days.length === 0
+              ? t('generateDays', { count: form.durationDays })
+              : t('addRemainingDays', { count: form.durationDays - days.length })}
           </Button>
         </div>
       )}

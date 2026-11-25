@@ -14,8 +14,13 @@ export interface ContactPrefill {
   destination?: string
   /** Interest labels / category slugs */
   interests?: string[]
-  /** Travel month 'YYYY-MM' or a free label such as "flexible" */
+  /**
+   * Travel month 'YYYY-MM', a month range 'YYYY-MM/YYYY-MM' (hero window, quiz season — the wizard keeps it
+   * exactly) or a free label such as "flexible"
+   */
   month?: string
+  /** Trip length id of the wizard ('short' | 'essential' | 'indepth' | 'grand' | 'flexible'), e.g. from the quiz */
+  duration?: 'short' | 'essential' | 'indepth' | 'grand' | 'flexible'
   party?: PartyType
   adults?: number
   children?: number
@@ -25,6 +30,7 @@ export interface ContactPrefill {
 }
 
 const PARTY_TYPES: readonly PartyType[] = ['couple', 'family', 'group', 'solo', 'corporate']
+const DURATIONS = ['short', 'essential', 'indepth', 'grand', 'flexible'] as const
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const LIMITS = { slug: 100, interest: 60, interests: 20, month: 40, message: 2000, source: 120 } as const
 
@@ -57,6 +63,7 @@ export function parseContactPrefill(params: SearchParamsLike): ContactPrefill {
   const month = first(params, 'month')
   const message = first(params, 'message')
   const source = first(params, 'source')
+  const duration = first(params, 'duration')
 
   const out: ContactPrefill = {
     tour: slug(first(params, 'tour')),
@@ -64,6 +71,7 @@ export function parseContactPrefill(params: SearchParamsLike): ContactPrefill {
     interests: interests.length ? [...new Set(interests)].slice(0, LIMITS.interests) : undefined,
     month: month && month.length <= LIMITS.month ? month : undefined,
     party: PARTY_TYPES.includes(party as PartyType) ? (party as PartyType) : undefined,
+    duration: (DURATIONS as readonly string[]).includes(duration ?? '') ? (duration as ContactPrefill['duration']) : undefined,
     adults: clampInt(first(params, 'adults'), 1, 50),
     children: clampInt(first(params, 'children'), 0, 50),
     message: message ? message.slice(0, LIMITS.message) : undefined,
@@ -80,6 +88,7 @@ export function buildContactQuery(prefill: ContactPrefill): Record<string, strin
   if (prefill.interests?.length) query.interests = prefill.interests.join(',')
   if (prefill.month) query.month = prefill.month
   if (prefill.party) query.party = prefill.party
+  if (prefill.duration) query.duration = prefill.duration
   if (prefill.adults !== undefined) query.adults = String(prefill.adults)
   if (prefill.children !== undefined) query.children = String(prefill.children)
   if (prefill.message) query.message = prefill.message

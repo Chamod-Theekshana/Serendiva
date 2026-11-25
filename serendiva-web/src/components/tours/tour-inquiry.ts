@@ -1,6 +1,7 @@
 import { z } from 'zod'
-import type { InquiryBody, Locale, PartyType } from '@/lib/api/types'
-import { emailSchema, honeypot, optionalText, requiredPhone, requiredText } from '@/lib/validation/shared'
+import type { InquiryBody, Locale } from '@/lib/api/types'
+import { partyForGuests } from '@/lib/party'
+import { emailSchema, honeypot, optionalIntlPhone, optionalText, requiredText } from '@/lib/validation/shared'
 
 /*
  * Tour sidebar inquiry form (Stitch "Bespoke Inquiry for This Tour"): name, email, WhatsApp, estimated month,
@@ -8,16 +9,15 @@ import { emailSchema, honeypot, optionalText, requiredPhone, requiredText } from
  * mapped to POST /inquiries with the tour slug and the page it was sent from.
  */
 
-export const GUEST_OPTIONS = ['couple', 'solo', 'family', 'group'] as const
-export type GuestOption = (typeof GUEST_OPTIONS)[number]
+/** Guest counts are the visitor's real numbers (never invented from a party preset); the party follows them. */
+export { ADULT_COUNTS, CHILD_COUNTS, partyForGuests } from '@/lib/party'
 
-/** Stitch guest choices → API party type + (minimum) number of adults. */
-export const GUEST_PARTY: Record<GuestOption, { partyType: PartyType; adults: number }> = {
-  couple: { partyType: 'couple', adults: 2 },
-  solo: { partyType: 'solo', adults: 1 },
-  family: { partyType: 'family', adults: 3 },
-  group: { partyType: 'group', adults: 5 },
-}
+const count = (max: number) =>
+  z
+    .string()
+    .regex(/^\d{1,2}$/, 'integer')
+    .transform(Number)
+    .refine((n) => n <= max, 'max')
 
 /** Month select value for "I am flexible". Other values are 'YYYY-MM'. */
 export const FLEXIBLE_MONTH = 'flexible'
@@ -26,12 +26,14 @@ const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
 export const tourInquirySchema = z.object({
   name: requiredText(120, 2, 'nameTooShort'),
   email: emailSchema,
-  whatsapp: requiredPhone(5, 40),
+  // Optional (email is the required contact) — with its country code when given.
+  whatsapp: optionalIntlPhone(40),
   month: z
     .string()
     .trim()
     .refine((v) => v === '' || v === FLEXIBLE_MONTH || MONTH.test(v), 'month'),
-  guests: z.enum(GUEST_OPTIONS, { error: 'required' }),
+  adults: count(50).refine((n) => n >= 1, 'min'),
+  children: count(50),
   message: optionalText(5000),
   website: honeypot,
   turnstileToken: z.string().max(4096).optional(),
@@ -39,14 +41,15 @@ export const tourInquirySchema = z.object({
 
 export type TourInquiryFormValues = z.input<typeof tourInquirySchema>
 export type TourInquiryValues = z.output<typeof tourInquirySchema>
-export type TourInquiryField = 'name' | 'email' | 'whatsapp' | 'month' | 'guests' | 'message'
+export type TourInquiryField = 'name' | 'email' | 'whatsapp' | 'month' | 'adults' | 'children' | 'message'
 
 export const TOUR_INQUIRY_FIELDS: readonly TourInquiryField[] = [
   'name',
   'email',
   'whatsapp',
   'month',
-  'guests',
+  'adults',
+  'children',
   'message',
 ]
 
@@ -55,7 +58,8 @@ export const tourInquiryDefaults = (): TourInquiryFormValues => ({
   email: '',
   whatsapp: '',
   month: '',
-  guests: 'couple',
+  adults: '2',
+  children: '0',
   message: '',
   website: '',
 })
@@ -90,15 +94,14 @@ export interface TourInquiryContext {
 
 /** Parsed form values → API body (POST /inquiries). */
 export function toTourInquiryBody(values: TourInquiryValues, ctx: TourInquiryContext): InquiryBody {
-  const party = GUEST_PARTY[values.guests]
   const flexible = values.month === FLEXIBLE_MONTH
   const body: InquiryBody = {
     name: values.name,
     email: values.email,
     whatsapp: values.whatsapp,
-    partyType: party.partyType,
-    adults: party.adults,
-    children: 0,
+    partyType: partyForGuests(values.adults, values.children),
+    adults: values.adults,
+    children: values.children,
     interests: [],
     tourSlug: ctx.tourSlug,
     locale: ctx.locale,
@@ -116,15 +119,15 @@ export function toTourInquiryBody(values: TourInquiryValues, ctx: TourInquiryCon
   return body
 }
 
-/** API field paths → form fields (travel window / party details are entered through month & guests). */
+/** API field paths → form fields (travel window entered through month, party derived from the guest counts). */
 export function mapInquiryFieldErrors(fieldErrors: Record<string, string>): Record<string, string> {
   const mapped: Record<string, string> = {}
   for (const [path, message] of Object.entries(fieldErrors)) {
     const field =
       path === 'travelWindow' || path === 'travelStart' || path === 'flexibleDates'
         ? 'month'
-        : path === 'partyType' || path === 'adults' || path === 'children'
-          ? 'guests'
+        : path === 'partyType'
+          ? 'adults'
           : path
     mapped[field] ??= message
   }

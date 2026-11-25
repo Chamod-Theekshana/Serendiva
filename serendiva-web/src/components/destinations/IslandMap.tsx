@@ -6,7 +6,17 @@ import { Link } from '@/i18n/navigation'
 import { contactHref } from '@/lib/prefill'
 import { cn } from '@/lib/utils'
 import { Icon } from '@/components/ui/Icon'
-import { HILL_CONTOUR_PATH, ISLAND_PATH, MAP_VIEWBOX, REEF_PATH, type LabelAnchor } from './islandMap'
+import {
+  ADAMS_BRIDGE_PATH,
+  HIGHLAND_PEAK_CONTOUR_PATH,
+  HILL_CONTOUR_PATH,
+  ISLAND_PATH,
+  MAP_VIEWBOX,
+  OFFSHORE_ISLAND_PATHS,
+  REEF_PATH,
+  WHALE_CORRIDOR_PATH,
+  type LabelAnchor,
+} from './islandMapGeometry'
 import { regionTone } from './regionTones'
 import { useRegionParam } from './useRegionParam'
 
@@ -65,6 +75,7 @@ const CENTRED = { transformBox: 'fill-box', transformOrigin: 'center' } as const
 function IslandMapView({ hubs, regions, selectedRegion, onRegionChange }: IslandMapViewProps) {
   const t = useTranslations('destinations.map')
   const tooltipId = useId()
+  const landGradientId = useId()
   const [activeSlug, setActiveSlug] = useState<string | null>(null)
   const [previewRegion, setPreviewRegion] = useState<string | null>(null)
   const highlight = previewRegion ?? selectedRegion
@@ -78,7 +89,7 @@ function IslandMapView({ hubs, regions, selectedRegion, onRegionChange }: Island
     <div className="relative w-full overflow-hidden rounded-2xl bg-surface p-space-lg shadow-md md:p-space-xl">
       <div className="flex flex-col items-stretch gap-space-xl lg:flex-row">
         {/* Vector map canvas */}
-        <div className="relative flex min-h-[460px] w-full items-center justify-center overflow-hidden rounded-xl bg-surface-container-lowest p-space-md md:min-h-[520px] lg:w-7/12">
+        <div className="relative flex min-h-[480px] w-full flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-space-md md:min-h-[540px] lg:w-7/12">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 opacity-20"
@@ -87,108 +98,195 @@ function IslandMapView({ hubs, regions, selectedRegion, onRegionChange }: Island
               backgroundSize: '20px 20px',
             }}
           />
-          <svg
-            role="group"
-            aria-label={t('label')}
-            className="h-auto w-full max-w-[420px] drop-shadow-lg"
-            fill="none"
-            viewBox={`0 0 ${MAP_VIEWBOX.width} ${MAP_VIEWBOX.height}`}
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path d={ISLAND_PATH} fill="#F3EDE2" stroke="#0F4C5C" strokeLinejoin="round" strokeWidth={2} />
-            <path
-              d={HILL_CONTOUR_PATH}
-              fill="#E2DAC9"
-              opacity={0.8}
-              stroke="#9C441E"
-              strokeDasharray="3 3"
-              strokeWidth={1}
-            />
-            <path
-              d={REEF_PATH}
-              opacity={0.6}
-              stroke="#003441"
-              strokeDasharray="2 4"
-              strokeLinecap="round"
-              strokeWidth={2}
-            />
-            {hubs.map((hub) => {
-              const tone = regionTone(hub.toneIndex)
-              const isActive = hub.slug === active?.slug
-              const dimmed = highlight !== null && hub.regionSlug !== highlight
-              const lit = highlight !== null && hub.regionSlug === highlight
-              return (
-                <Link
-                  key={hub.slug}
-                  href={`/destinations/${hub.slug}`}
-                  aria-label={t('hubLink', { name: hub.name, region: hub.regionName ?? '' })}
-                  aria-describedby={isActive ? tooltipId : undefined}
-                  onMouseEnter={() => setActiveSlug(hub.slug)}
-                  onFocus={() => setActiveSlug(hub.slug)}
-                  className={cn(
-                    'group cursor-pointer transition-opacity duration-300 focus:outline-none focus-visible:outline-none',
-                    dimmed && 'opacity-25',
-                  )}
+          <div className="relative z-10 flex flex-1 items-center justify-center">
+            <svg
+              role="group"
+              aria-label={t('label')}
+              className="h-auto w-full max-w-[440px] drop-shadow-sm"
+              fill="none"
+              viewBox={`0 0 ${MAP_VIEWBOX.width} ${MAP_VIEWBOX.height}`}
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <defs>
+                <linearGradient id={landGradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#F7F2E8" />
+                  <stop offset="100%" stopColor="#ECE3D2" />
+                </linearGradient>
+              </defs>
+              {/* Subtle coastal bathymetry halo */}
+              <path d={ISLAND_PATH} stroke="#0F4C5C" strokeLinejoin="round" strokeOpacity={0.06} strokeWidth={12} />
+              <path d={ISLAND_PATH} stroke="#0F4C5C" strokeLinejoin="round" strokeOpacity={0.11} strokeWidth={4.5} />
+              {/* Adam's Bridge shoal chain */}
+              <path
+                d={ADAMS_BRIDGE_PATH}
+                stroke="#0F4C5C"
+                strokeDasharray="1.5 4"
+                strokeLinecap="round"
+                strokeOpacity={0.32}
+                strokeWidth={1.5}
+              />
+              {/* Mainland + Jaffna Peninsula */}
+              <path
+                d={ISLAND_PATH}
+                fill={`url(#${landGradientId})`}
+                stroke="#0F4C5C"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.55}
+              />
+              {/* Mannar and Jaffna archipelago islands */}
+              {OFFSHORE_ISLAND_PATHS.map((path, index) => (
+                <path
+                  key={index}
+                  d={path}
+                  fill={`url(#${landGradientId})`}
+                  stroke="#0F4C5C"
+                  strokeLinejoin="round"
+                  strokeWidth={1.15}
+                />
+              ))}
+              {/* Central Highlands topographic contours */}
+              <path
+                d={HILL_CONTOUR_PATH}
+                fill="#E3DAC6"
+                fillOpacity={0.62}
+                stroke="#9C441E"
+                strokeDasharray="3 3"
+                strokeOpacity={0.5}
+                strokeWidth={1}
+              />
+              <path
+                d={HIGHLAND_PEAK_CONTOUR_PATH}
+                fill="#D9CCB2"
+                fillOpacity={0.52}
+                stroke="#9C441E"
+                strokeDasharray="2 2.5"
+                strokeOpacity={0.72}
+                strokeWidth={0.9}
+              />
+              {/* Offshore east reef and southern whale shelf */}
+              <path
+                d={REEF_PATH}
+                stroke="#003441"
+                strokeDasharray="2 4.5"
+                strokeLinecap="round"
+                strokeOpacity={0.42}
+                strokeWidth={1.6}
+              />
+              <path
+                d={WHALE_CORRIDOR_PATH}
+                stroke="#0F4C5C"
+                strokeDasharray="2 4.5"
+                strokeLinecap="round"
+                strokeOpacity={0.35}
+                strokeWidth={1.5}
+              />
+              {/* Minimalist North compass rose */}
+              <g aria-hidden="true" transform="translate(432, 56)" opacity={0.52} stroke="#0F4C5C" fill="#0F4C5C">
+                <line x1={0} y1={-12} x2={0} y2={12} strokeWidth={0.9} />
+                <line x1={-8} y1={0} x2={8} y2={0} strokeOpacity={0.6} strokeWidth={0.7} />
+                <polygon points="0,-13 -2.8,-5 0,-7 2.8,-5" stroke="none" />
+                <text
+                  x={0}
+                  y={-16}
+                  textAnchor="middle"
+                  fontSize={8.5}
+                  fontWeight={600}
+                  letterSpacing="0.08em"
+                  stroke="none"
                 >
-                  {/* generous invisible hit area */}
-                  <circle cx={hub.x} cy={hub.y} r={14} className="fill-transparent" />
-                  {hub.signature && (
-                    <circle
-                      cx={hub.x}
-                      cy={hub.y}
-                      r={12}
-                      fillOpacity={0.2}
-                      className={cn(tone.fill, 'motion-safe:animate-pulse')}
-                      style={CENTRED}
-                    />
-                  )}
-                  {(lit || isActive) && (
-                    <circle
-                      cx={hub.x}
-                      cy={hub.y}
-                      r={10}
-                      fill="none"
-                      strokeWidth={1.5}
-                      className={cn('transition-all', tone.stroke, isActive && !lit && 'opacity-60')}
-                    />
-                  )}
-                  <circle
-                    cx={hub.x}
-                    cy={hub.y}
-                    r={14}
-                    fill="none"
-                    strokeWidth={2}
-                    className="stroke-primary opacity-0 group-focus-visible:opacity-100"
-                  />
-                  <circle cx={hub.x} cy={hub.y} r={hub.signature || isActive ? 6 : 5.5} className={tone.fill} />
-                  <text
-                    x={hub.labelX}
-                    y={hub.labelY}
-                    textAnchor={hub.anchor}
+                  N
+                </text>
+              </g>
+              {hubs.map((hub) => {
+                const tone = regionTone(hub.toneIndex)
+                const isActive = hub.slug === active?.slug
+                const dimmed = highlight !== null && hub.regionSlug !== highlight
+                const lit = highlight !== null && hub.regionSlug === highlight
+                return (
+                  <Link
+                    key={hub.slug}
+                    href={`/destinations/${hub.slug}`}
+                    aria-label={t('hubLink', { name: hub.name, region: hub.regionName ?? '' })}
+                    aria-describedby={isActive ? tooltipId : undefined}
+                    onMouseEnter={() => setActiveSlug(hub.slug)}
+                    onFocus={() => setActiveSlug(hub.slug)}
                     className={cn(
-                      'select-none font-label-md text-[11px] transition-colors',
-                      hub.signature ? 'font-bold' : 'font-semibold',
-                      tone.labelFill,
-                      'group-hover:fill-secondary group-focus-visible:fill-secondary',
+                      'group cursor-pointer transition-opacity duration-300 focus:outline-none focus-visible:outline-none',
+                      dimmed && 'opacity-25',
                     )}
                   >
-                    {hub.label}
-                  </text>
-                </Link>
-              )
-            })}
-          </svg>
+                    {/* generous invisible hit area */}
+                    <circle cx={hub.x} cy={hub.y} r={14} className="fill-transparent" />
+                    {hub.signature && (
+                      <circle
+                        cx={hub.x}
+                        cy={hub.y}
+                        r={12}
+                        fillOpacity={0.2}
+                        className={cn(tone.fill, 'motion-safe:animate-pulse')}
+                        style={CENTRED}
+                      />
+                    )}
+                    {(lit || isActive) && (
+                      <circle
+                        cx={hub.x}
+                        cy={hub.y}
+                        r={10}
+                        fill="none"
+                        strokeWidth={1.5}
+                        className={cn('transition-all', tone.stroke, isActive && !lit && 'opacity-60')}
+                      />
+                    )}
+                    <circle
+                      cx={hub.x}
+                      cy={hub.y}
+                      r={14}
+                      fill="none"
+                      strokeWidth={2}
+                      className="stroke-primary opacity-0 group-focus-visible:opacity-100"
+                    />
+                    <circle
+                      cx={hub.x}
+                      cy={hub.y}
+                      r={hub.signature || isActive ? 5.8 : 5}
+                      stroke="#F7F2E8"
+                      strokeWidth={1.6}
+                      className={tone.fill}
+                    />
+                    <text
+                      x={hub.labelX}
+                      y={hub.labelY}
+                      textAnchor={hub.anchor}
+                      style={{
+                        paintOrder: 'stroke',
+                        stroke: '#FAF7F1',
+                        strokeWidth: 3.5,
+                        strokeLinejoin: 'round',
+                      }}
+                      className={cn(
+                        'select-none font-label-md text-[11px] transition-colors',
+                        hub.signature ? 'font-bold' : 'font-semibold',
+                        tone.labelFill,
+                        'group-hover:fill-secondary group-focus-visible:fill-secondary',
+                      )}
+                    >
+                      {hub.label}
+                    </text>
+                  </Link>
+                )
+              })}
+            </svg>
+          </div>
           {hubs.length === 0 && (
-            <p className="absolute inset-x-4 top-4 text-center font-caption text-caption text-on-surface-variant">
-              {t('empty')}
-            </p>
+            <p className="relative z-10 text-center font-caption text-caption text-on-surface-variant">{t('empty')}</p>
           )}
-          {/* Floating active-hub card */}
+          {/* Active-hub card below the SVG so southern coastal hubs stay completely clear */}
           {active && (
             <div
               id={tooltipId}
               aria-live="polite"
-              className="absolute bottom-4 left-4 right-4 rounded-lg border-0 bg-surface/95 p-space-sm shadow-sm backdrop-blur-md transition-all duration-300"
+              className="relative z-10 mt-space-sm min-h-[76px] rounded-lg border border-outline-variant/20 bg-surface/95 p-space-sm shadow-sm backdrop-blur-md transition-all duration-300"
             >
               <div className="flex items-center gap-space-xs">
                 <span aria-hidden="true" className={cn('h-2 w-2 rounded-full', regionTone(active.toneIndex).dot)} />

@@ -28,7 +28,7 @@ export function DestinationInquiryCard({ destination: d, guide, months }: Destin
     <section
       id="include-in-journey"
       aria-labelledby="include-in-journey-title"
-      className="flex flex-col gap-space-lg rounded-xl bg-surface-container-lowest p-space-lg shadow-[0_16px_36px_-12px_rgba(43,43,43,0.08),0_4px_12px_-4px_rgba(43,43,43,0.04)] md:p-space-xl"
+      className="flex scroll-mt-28 flex-col gap-space-lg rounded-xl bg-surface-container-lowest p-space-lg shadow-[0_16px_36px_-12px_rgba(43,43,43,0.08),0_4px_12px_-4px_rgba(43,43,43,0.04)] md:p-space-xl"
     >
       <div className="flex flex-col border-b border-surface-container pb-space-sm">
         <span className="font-label-md text-label-md font-semibold uppercase tracking-widest text-secondary">

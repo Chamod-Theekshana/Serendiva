@@ -1,5 +1,5 @@
 import type { AdminLocale, Translatable } from '@/lib/admin/translatable'
-import type { L, TourForm } from './model'
+import type { EditorTab, L, TourForm } from './model'
 
 /** Updates one form field; `clear` = error path prefixes to drop (defaults to the field name). */
 export type UpdateField = <K extends keyof TourForm>(
@@ -14,6 +14,7 @@ export interface EditorTabProps {
   locale: AdminLocale
   errors: Record<string, string>
   update: UpdateField
+  onJumpTab?: (tab: EditorTab) => void
 }
 
 /** TranslatableText → editing shape with all three locales. */

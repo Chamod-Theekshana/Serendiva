@@ -13,7 +13,6 @@ export interface QuickInquiryOption {
 
 export interface QuickInquiryPartyOption {
   party: PartyType
-  adults: number
   label: string
 }
 
@@ -51,13 +50,11 @@ export function QuickInquiryBar({
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const choice = partyOptions.find((p) => p.party === party)
     router.push(
       contactHref({
         interests: focus ? [focus] : undefined,
         month: month || undefined,
         party,
-        adults: choice?.adults,
         source,
       }),
     )

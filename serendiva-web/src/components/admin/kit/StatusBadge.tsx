@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 
 /** Status vocabularies used by the API. */
 export const STATUS_VALUES = {
-  lead: ['new', 'replied', 'closed'],
+  lead: ['new', 'replied', 'proposal_sent', 'confirmed', 'lost', 'cancelled'],
   content: ['draft', 'published'],
   review: ['pending', 'approved', 'rejected'],
   email: ['pending', 'sent', 'partial', 'failed'],
@@ -32,7 +32,10 @@ const TONES: { [K in StatusKind]: Record<StatusValue<K>, { tone: Tone; icon: str
   lead: {
     new: { tone: 'cinnamon', icon: 'fiber_manual_record', filled: true },
     replied: { tone: 'teal', icon: 'reply' },
-    closed: { tone: 'sand', icon: 'check_circle' },
+    proposal_sent: { tone: 'gold', icon: 'description' },
+    confirmed: { tone: 'green', icon: 'verified' },
+    lost: { tone: 'sand', icon: 'block' },
+    cancelled: { tone: 'red', icon: 'cancel' },
   },
   content: {
     draft: { tone: 'sand', icon: 'edit_note' },

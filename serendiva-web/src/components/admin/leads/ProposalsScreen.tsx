@@ -11,13 +11,13 @@ import { EmptyPanel, ErrorPanel } from '@/components/admin/kit/Panels'
 import { StatusBadge } from '@/components/admin/kit/StatusBadge'
 import { Icon } from '@/components/ui/Icon'
 import { useAdminQuery } from '@/lib/admin/hooks'
-import { isLeadStatus, LEAD_PAGE_SIZE, LEAD_STATUSES, proposalsApi } from '@/lib/admin/leads'
+import { isLeadDue, isLeadSort, isLeadStatus, LEAD_PAGE_SIZE, LEAD_STATUSES, proposalsApi } from '@/lib/admin/leads'
 import { useDrawerParam, useUrlState } from '@/lib/admin/url-state'
 import type { AdminProposalListItem } from '@/lib/api/types'
 import { ProposalDrawer } from './ProposalDrawer'
 import { useLeadFormat } from './useLeadFormat'
 
-const DEFAULTS = { status: '', q: '', from: '', to: '', page: '1' }
+const DEFAULTS = { status: '', q: '', from: '', to: '', due: '', sort: '', guideEmail: '', page: '1' }
 
 /** /admin/proposals — corporate proposal requests: same pattern as inquiries (+ attachment download in the drawer). */
 export function ProposalsScreen() {
@@ -27,11 +27,14 @@ export function ProposalsScreen() {
   const filters = useUrlState(DEFAULTS)
   const drawer = useDrawerParam('id')
 
-  const { status: rawStatus, q, from, to, page: rawPage } = filters.values
+  const { status: rawStatus, q, from, to, due: rawDue, sort: rawSort, guideEmail: rawGuideEmail, page: rawPage } = filters.values
   const status = isLeadStatus(rawStatus) ? rawStatus : undefined
+  const due = isLeadDue(rawDue) ? rawDue : undefined
+  const sort = isLeadSort(rawSort) ? rawSort : undefined
+  const guideEmail = rawGuideEmail === 'missing' ? ('missing' as const) : undefined
   const page = Math.max(1, Number.parseInt(rawPage, 10) || 1)
-  const exportQuery = { status, q, from, to }
-  const query = { ...exportQuery, page, pageSize: LEAD_PAGE_SIZE }
+  const exportQuery = { status, q, from, to, due, sort }
+  const query = { ...exportQuery, guideEmail, page, pageSize: LEAD_PAGE_SIZE }
   const list = useAdminQuery(['proposals', query], (signal) => proposalsApi.list(query, signal))
   const counts = list.data?.counts
 
@@ -44,10 +47,19 @@ export function ProposalsScreen() {
         <span className="flex min-w-0 flex-col">
           <span className="flex items-center gap-1.5 font-semibold text-primary">
             {row.company}
+            {row.replyOverdue && <Icon name="schedule" className="text-[15px] text-error" label={tl('overdue')} />}
             {row.hasNotes && <Icon name="sticky_note_2" className="text-[15px] text-secondary" label={tl('hasNotes')} />}
             {row.hasAttachment && <Icon name="attach_file" className="text-[15px] text-on-surface-variant" label={t('hasAttachment')} />}
+            {row.emailStatus !== 'sent' && row.emailStatus !== 'pending' && (
+              <Icon name="mail_lock" className="text-[15px] text-error" label={tl('emailProblem')} />
+            )}
           </span>
           <span className="truncate font-caption text-caption text-on-surface-variant">{row.contactPerson}</span>
+          {row.followUpAt && (
+            <span className="font-caption text-caption font-medium text-secondary">
+              {tl('followUpBadge', { date: f.calendarDate(row.followUpAt) })}
+            </span>
+          )}
         </span>
       ),
       className: 'min-w-[12rem]',
@@ -98,11 +110,46 @@ export function ProposalsScreen() {
             ...LEAD_STATUSES.map((s) => ({ value: s, label: tl(`tabs.${s}`), count: counts?.[s] })),
           ]}
         />
+        {due && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-secondary-fixed/50 px-3 py-2 font-body-md text-body-md text-on-secondary-fixed-variant">
+            <Icon name="schedule" className="text-[18px]" />
+            <span className="mr-auto">{due === 'reply' ? tl('dueReplyFilter') : tl('dueFollowUpFilter')}</span>
+            <Button size="sm" variant="ghost" icon="close" onClick={() => filters.set({ due: '' })}>
+              {tl('clearFilters')}
+            </Button>
+          </div>
+        )}
+        {guideEmail && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-error-container px-3 py-2 font-body-md text-body-md text-on-error-container">
+            <Icon name="mail_lock" className="text-[18px]" />
+            <span className="mr-auto">{t('guideEmailFilter')}</span>
+            <Button size="sm" variant="ghost" icon="close" onClick={() => filters.set({ guideEmail: '' })}>
+              {tl('clearFilters')}
+            </Button>
+          </div>
+        )}
         <FilterBar
           state={filters}
           fields={[
             { type: 'search', key: 'q', label: tl('filters.search'), placeholder: t('searchPlaceholder') },
+            {
+              type: 'select',
+              key: 'due',
+              label: tl('filters.due'),
+              allLabel: tl('filters.dueAll'),
+              options: [
+                { value: 'reply', label: tl('filters.dueReply') },
+                { value: 'followUp', label: tl('filters.dueFollowUp') },
+              ],
+            },
             { type: 'dateRange', fromKey: 'from', toKey: 'to', label: tl('filters.received') },
+            {
+              type: 'select',
+              key: 'sort',
+              label: tl('filters.sort'),
+              allLabel: tl('filters.sortNewest'),
+              options: [{ value: 'oldest', label: tl('filters.sortOldest') }],
+            },
           ]}
         />
         {list.error && !list.data ? (

@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import type { AvailabilityCalendar as AvailabilityCalendarDto } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 import { Icon } from '@/components/ui/Icon'
-import { dayStatus, isoDay, monthIndex, type DayStatus } from '@/lib/availability'
+import { dayStatus, isBetweenDates, isoDay, monthIndex, type DayStatus } from '@/lib/availability'
 
 const STATUS_CLASS: Record<DayStatus, string> = {
   available: 'bg-tertiary-fixed text-on-tertiary-fixed font-semibold',
@@ -23,11 +23,31 @@ export interface AvailabilityCalendarProps {
   monthsToShow?: 1 | 2
   /** Heading shown above the grid. */
   title?: string
+  /** Currently selected range start ('YYYY-MM-DD', inclusive) when interactive. */
+  selectedStart?: string
+  /** Currently selected range end ('YYYY-MM-DD', inclusive) when interactive. */
+  selectedEnd?: string
+  /** When set, non-past days become buttons calling this with 'YYYY-MM-DD'. */
+  onSelectDate?: (isoDate: string) => void
+  /** Clears the active date selection. */
+  onClearSelection?: () => void
+  /** Helper caption shown above the legend when interactive. */
+  selectionHint?: string
   className?: string
 }
 
-/** Read-only availability calendar (prev/next month, legend, screen-reader status per day). */
-export function AvailabilityCalendar({ calendar, monthsToShow = 1, title, className }: AvailabilityCalendarProps) {
+/** Availability calendar (prev/next month, legend, screen-reader status per day; optionally interactive). */
+export function AvailabilityCalendar({
+  calendar,
+  monthsToShow = 1,
+  title,
+  selectedStart = '',
+  selectedEnd = '',
+  onSelectDate,
+  onClearSelection,
+  selectionHint,
+  className,
+}: AvailabilityCalendarProps) {
   const t = useTranslations('common.a11y.calendar')
   const locale = useLocale()
   const today = calendar.from
@@ -125,24 +145,50 @@ export function AvailabilityCalendar({ calendar, monthsToShow = 1, title, classN
                       const iso = isoDay(year, month, day)
                       const status = dayStatus(iso, today, calendar.ranges)
                       const isToday = iso === today
+                      const isEdge = Boolean(
+                        onSelectDate && ((selectedStart && iso === selectedStart) || (selectedEnd && iso === selectedEnd)),
+                      )
+                      const inRange = Boolean(
+                        onSelectDate && selectedStart && selectedEnd && isBetweenDates(iso, selectedStart, selectedEnd),
+                      )
+                      const interactive = Boolean(onSelectDate && status !== 'past')
+                      const cellClasses = cn(
+                        'flex h-9 w-full items-center justify-center rounded-lg font-body-md text-body-md transition-colors',
+                        STATUS_CLASS[status],
+                        isToday && !isEdge && 'ring-2 ring-inset ring-secondary',
+                        inRange && 'bg-primary/15 font-semibold text-primary no-underline',
+                        isEdge && 'bg-primary font-bold text-on-primary no-underline shadow-sm',
+                        interactive &&
+                          'cursor-pointer hover:ring-2 hover:ring-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                      )
+                      const srText = (
+                        <span className="sr-only">
+                          {t('dayStatus', {
+                            date: dayFormatter.format(new Date(Date.UTC(year, month, day, 12))),
+                            status: statusLabel[status],
+                          })}
+                          {isToday ? `, ${t('today')}` : ''}
+                          {isEdge || inRange ? `, ${t('selected')}` : ''}
+                        </span>
+                      )
                       return (
                         <td key={di} className="p-0">
-                          <div
-                            className={cn(
-                              'flex h-9 items-center justify-center rounded-lg font-body-md text-body-md',
-                              STATUS_CLASS[status],
-                              isToday && 'ring-2 ring-inset ring-secondary',
-                            )}
-                          >
-                            <span aria-hidden="true">{day}</span>
-                            <span className="sr-only">
-                              {t('dayStatus', {
-                                date: dayFormatter.format(new Date(Date.UTC(year, month, day, 12))),
-                                status: statusLabel[status],
-                              })}
-                              {isToday ? `, ${t('today')}` : ''}
-                            </span>
-                          </div>
+                          {interactive ? (
+                            <button
+                              type="button"
+                              onClick={() => onSelectDate!(iso)}
+                              aria-pressed={isEdge || inRange}
+                              className={cellClasses}
+                            >
+                              <span aria-hidden="true">{day}</span>
+                              {srText}
+                            </button>
+                          ) : (
+                            <div className={cellClasses}>
+                              <span aria-hidden="true">{day}</span>
+                              {srText}
+                            </div>
+                          )}
                         </td>
                       )
                     })}
@@ -155,6 +201,20 @@ export function AvailabilityCalendar({ calendar, monthsToShow = 1, title, classN
       </div>
 
       <div className="flex flex-col gap-space-sm border-t border-surface-container-high pt-space-md">
+        {onSelectDate && (selectionHint || selectedStart) && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface px-space-sm py-1.5 font-caption text-caption text-on-surface-variant">
+            <span>{selectionHint}</span>
+            {selectedStart && onClearSelection && (
+              <button
+                type="button"
+                onClick={onClearSelection}
+                className="font-semibold text-primary underline underline-offset-4 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                {t('clearSelection')}
+              </button>
+            )}
+          </div>
+        )}
         <ul
           aria-label={t('legend')}
           className="flex flex-wrap gap-space-md font-caption text-caption text-on-surface-variant"

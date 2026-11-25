@@ -2,47 +2,125 @@ import { describe, expect, it } from 'vitest'
 import { paragraphs, plainText, splitDescription, splitExperienceMeta } from '../content'
 import { compassPoint, distanceKm, nearestNeighbours } from '../geo'
 import { destinationGridLayout } from '../gridLayout'
-import { hubPosition, isInsideIsland, labelWidth, layoutLabels, projectLatLng, shortHubLabel } from '../islandMap'
+import {
+  ISLAND_POLYGONS,
+  MAP_VIEWBOX,
+  hubPosition,
+  isInsideIsland,
+  labelWidth,
+  layoutLabels,
+  projectLatLng,
+  shortHubLabel,
+} from '../islandMapGeometry'
 import { regionTone } from '../regionTones'
 
-/** Hubs Stitch placed by hand: [lat, lng, x, y]. */
-const STITCH_HUBS: Record<string, [number, number, number, number]> = {
-  Trincomalee: [8.5874, 81.2152, 295, 210],
-  Sigiriya: [7.957, 80.7603, 225, 255],
-  Kandy: [7.2906, 80.6337, 215, 340],
-  Colombo: [6.9271, 79.8612, 140, 390],
-  'Nuwara Eliya': [6.9497, 80.7891, 220, 385],
-  Ella: [6.8667, 81.0466, 240, 420],
-  Yala: [6.3725, 81.5169, 275, 485],
-  Galle: [6.0267, 80.217, 160, 545],
-}
+/** All 12 seeded destinations in display order: [label, lat, lng]. */
+const SEEDED_DESTINATIONS: readonly [string, number, number][] = [
+  ['Ella', 6.8667, 81.0466],
+  ['Sigiriya', 7.957, 80.7603],
+  ['Galle Fort', 6.0267, 80.217],
+  ['Yala', 6.3725, 81.5169],
+  ['Kandy', 7.2906, 80.6337],
+  ['Mirissa', 5.9483, 80.4716],
+  ['Nuwara Eliya', 6.9497, 80.7891],
+  ['Trincomalee', 8.5874, 81.2152],
+  ['Anuradhapura', 7.9403, 81.0188],
+  ['Udawalawe', 6.4333, 80.8833],
+  ['Colombo', 6.9271, 79.8612],
+  ['Bentota', 6.421, 79.998],
+]
 
 describe('island map projection', () => {
-  it('lands close to the hubs Stitch placed by hand', () => {
-    for (const [name, [lat, lng, x, y]] of Object.entries(STITCH_HUBS)) {
-      const p = projectLatLng(lat, lng)
-      expect(Math.hypot(p.x - x, p.y - y), name).toBeLessThan(40)
+  it('uses an unsheared true-scale projection aligned to Sri Lanka proportions', () => {
+    const base = projectLatLng(7.5, 80.5)
+    const east1 = projectLatLng(7.5, 81.5)
+    const north1 = projectLatLng(8.5, 80.5)
+
+    // Pure longitude step keeps y invariant; pure latitude step keeps x invariant (zero shear).
+    expect(east1.y).toBeCloseTo(base.y, 6)
+    expect(north1.x).toBeCloseTo(base.x, 6)
+
+    const scaleX = east1.x - base.x
+    const scaleY = base.y - north1.y
+    expect(scaleX / scaleY).toBeCloseTo(Math.cos((7.8774 * Math.PI) / 180), 4)
+
+    // Real geographic tilt: northern tip Point Pedro sits west of southern tip Dondra Head.
+    const pointPedro = projectLatLng(9.83, 80.21)
+    const dondraHead = projectLatLng(5.92, 80.59)
+    expect(pointPedro.x).toBeLessThan(dondraHead.x)
+
+    // Overall bounding-box aspect ratio (mainland + offshore islands) matches real Sri Lanka (~0.56–0.57).
+    const allPts = ISLAND_POLYGONS.flat()
+    const xs = allPts.map((p) => p.x)
+    const ys = allPts.map((p) => p.y)
+    const width = Math.max(...xs) - Math.min(...xs)
+    const height = Math.max(...ys) - Math.min(...ys)
+    const ratio = width / height
+    expect(ratio).toBeGreaterThan(0.53)
+    expect(ratio).toBeLessThan(0.6)
+  })
+
+  it('keeps every seeded destination and coastal extreme inside the island without inland yanking', () => {
+    const locations: readonly [string, number, number][] = [
+      ...SEEDED_DESTINATIONS,
+      ['Point Pedro', 9.83, 80.21],
+      ['Dondra Head', 5.92, 80.59],
+      ['Kalpitiya', 8.23, 79.76],
+      ['Sangaman Kanda', 7.02, 81.88],
+      ['Jaffna', 9.6615, 80.0255],
+      ['Mannar', 8.981, 79.9044],
+      ['Arugam Bay', 6.84, 81.836],
+    ]
+
+    for (const [name, lat, lng] of locations) {
+      const raw = projectLatLng(lat, lng)
+      const hub = hubPosition(lat, lng)
+      expect(isInsideIsland(hub), name).toBe(true)
+      expect(Math.hypot(hub.x - raw.x, hub.y - raw.y), `${name} shift`).toBeLessThan(5)
+      expect(hub.x, `${name} x in viewBox`).toBeGreaterThan(0)
+      expect(hub.x, `${name} x in viewBox`).toBeLessThan(MAP_VIEWBOX.width)
+      expect(hub.y, `${name} y in viewBox`).toBeGreaterThan(0)
+      expect(hub.y, `${name} y in viewBox`).toBeLessThan(MAP_VIEWBOX.height)
+    }
+
+    // Offshore islands such as Mannar register as land, whereas open ocean stays outside.
+    expect(isInsideIsland(projectLatLng(8.981, 79.9044))).toBe(true)
+    for (const [lat, lng] of [
+      [5.5, 79.5],
+      [9.0, 82.0],
+      [9.3, 79.5],
+    ]) {
+      expect(isInsideIsland(projectLatLng(lat, lng))).toBe(false)
     }
   })
 
-  it('keeps every hub inside the island, even on the coast', () => {
-    const coastal: [number, number][] = [
-      [9.83, 80.21], // Point Pedro
-      [5.92, 80.59], // Dondra Head
-      [8.23, 79.76], // Kalpitiya
-      [7.02, 81.88], // Sangaman Kanda
-      [6.421, 79.998], // Bentota
-    ]
-    for (const [lat, lng] of coastal) expect(isInsideIsland(hubPosition(lat, lng))).toBe(true)
-  })
+  it('preserves real north-south and west-east geographic ordering', () => {
+    const jaffna = hubPosition(9.6615, 80.0255)
+    const trincomalee = hubPosition(8.5874, 81.2152)
+    const sigiriya = hubPosition(7.957, 80.7603)
+    const kandy = hubPosition(7.2906, 80.6337)
+    const ella = hubPosition(6.8667, 81.0466)
+    const galle = hubPosition(6.0267, 80.217)
+    const mirissa = hubPosition(5.9483, 80.4716)
+    const kalpitiya = hubPosition(8.23, 79.76)
+    const colombo = hubPosition(6.9271, 79.8612)
+    const yala = hubPosition(6.3725, 81.5169)
+    const arugamBay = hubPosition(6.84, 81.836)
 
-  it('keeps north above south and west left of east', () => {
-    const jaffna = hubPosition(9.66, 80.02)
-    const galle = hubPosition(6.03, 80.22)
-    const colombo = hubPosition(6.93, 79.86)
-    const batticaloa = hubPosition(7.73, 81.69)
-    expect(jaffna.y).toBeLessThan(galle.y)
-    expect(colombo.x).toBeLessThan(batticaloa.x)
+    expect(jaffna.y).toBeLessThan(trincomalee.y)
+    expect(trincomalee.y).toBeLessThan(sigiriya.y)
+    expect(sigiriya.y).toBeLessThan(kandy.y)
+    expect(kandy.y).toBeLessThan(ella.y)
+    expect(ella.y).toBeLessThan(galle.y)
+    expect(galle.y).toBeLessThan(mirissa.y)
+
+    expect(kalpitiya.x).toBeLessThan(colombo.x)
+    expect(colombo.x).toBeLessThan(galle.x)
+    expect(galle.x).toBeLessThan(kandy.x)
+    expect(kandy.x).toBeLessThan(ella.x)
+    expect(ella.x).toBeLessThan(trincomalee.x)
+    expect(trincomalee.x).toBeLessThan(yala.x)
+    expect(yala.x).toBeLessThan(arugamBay.x)
   })
 
   it('shortens compound names for map labels', () => {
@@ -51,27 +129,33 @@ describe('island map projection', () => {
     expect(shortHubLabel('Ella')).toBe('Ella')
   })
 
-  it('places labels without overlapping each other', () => {
-    const hubs = [
-      { ...hubPosition(6.8667, 81.0466), label: 'Ella' },
-      { ...hubPosition(6.9497, 80.7891), label: 'Nuwara Eliya' },
-      { ...hubPosition(7.2906, 80.6337), label: 'Kandy' },
-      { ...hubPosition(7.957, 80.7603), label: 'Sigiriya' },
-      { ...hubPosition(7.9403, 81.0188), label: 'Anuradhapura' },
-    ]
+  it('places labels for all 12 seeded destinations cleanly inside MAP_VIEWBOX without overlaps', () => {
+    const hubs = SEEDED_DESTINATIONS.map(([label, lat, lng]) => ({
+      ...hubPosition(lat, lng),
+      label,
+    }))
     const placements = layoutLabels(hubs)
     const boxes = placements.map((p, i) => {
       const w = labelWidth(hubs[i].label)
       const x1 = p.anchor === 'start' ? p.x : p.anchor === 'end' ? p.x - w : p.x - w / 2
-      return { x1, x2: x1 + w, y1: p.y - 8, y2: p.y + 3 }
+      return { x1, x2: x1 + w, y1: p.y - 8.5, y2: p.y + 3 }
     })
-    for (let i = 0; i < boxes.length; i++)
+
+    for (let i = 0; i < boxes.length; i++) {
+      expect(boxes[i].x1, `${hubs[i].label} left bound`).toBeGreaterThanOrEqual(0)
+      expect(boxes[i].x2, `${hubs[i].label} right bound`).toBeLessThanOrEqual(MAP_VIEWBOX.width)
+      expect(boxes[i].y1, `${hubs[i].label} top bound`).toBeGreaterThanOrEqual(0)
+      expect(boxes[i].y2, `${hubs[i].label} bottom bound`).toBeLessThanOrEqual(MAP_VIEWBOX.height)
+    }
+
+    for (let i = 0; i < boxes.length; i++) {
       for (let j = i + 1; j < boxes.length; j++) {
         const a = boxes[i]
         const b = boxes[j]
         const overlaps = a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2
         expect(overlaps, `${hubs[i].label} / ${hubs[j].label}`).toBe(false)
       }
+    }
   })
 })
 

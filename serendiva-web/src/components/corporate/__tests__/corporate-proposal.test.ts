@@ -57,12 +57,13 @@ describe('corporate RFP — submission (mocked fetch)', () => {
     const fetchMock = vi.fn(async () => json(201, { reference: 'SRD-C-2026-0001', message: 'Thanks' }))
     vi.stubGlobal('fetch', fetchMock)
     const payload = proposalSchema.parse(values(file('brief.pdf', 100, 'application/pdf')))
-    await expect(submitProposal(toProposalBody(payload))).resolves.toEqual({
+    await expect(submitProposal({ ...toProposalBody(payload), clientRequestId: 'prop-req-12345678' })).resolves.toEqual({
       ok: true,
       data: { reference: 'SRD-C-2026-0001', message: 'Thanks' },
     })
     const body = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as FormData
     expect(body.getAll('logistics')).toEqual(['Seaplane Charter', 'BIA VIP Fast-Track'])
+    expect(body.get('clientRequestId')).toBe('prop-req-12345678')
     expect((body.get('attachment') as File).name).toBe('brief.pdf')
     expect(body.get('message')).toBeNull()
   })

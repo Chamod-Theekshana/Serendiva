@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { confirmNewsletter, isPlausibleToken, unsubscribeNewsletter } from '@/lib/api/newsletter-client'
+import { newsletterSchema, toNewsletterBody } from '@/lib/validation/newsletter'
 
 const TOKEN = 'YKcZJvlQx2l_2-bnxeMNKjsAPiGlU0nI'
 
@@ -69,5 +70,22 @@ describe('newsletter token links', () => {
       vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))),
     )
     expect(await confirmNewsletter(TOKEN)).toEqual({ ok: false, kind: 'network' })
+  })
+
+  it('preserves optional turnstileToken in newsletter form payloads', () => {
+    const parsed = newsletterSchema.parse({
+      email: 'reader@example.com',
+      locale: 'de',
+      source: 'footer',
+      website: '',
+      turnstileToken: 'cf-token-xyz',
+    })
+    expect(toNewsletterBody(parsed)).toEqual({
+      email: 'reader@example.com',
+      locale: 'de',
+      source: 'footer',
+      website: '',
+      turnstileToken: 'cf-token-xyz',
+    })
   })
 })

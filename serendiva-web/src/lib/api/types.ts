@@ -107,11 +107,15 @@ export type SettingInstagramFeedBody = Schemas['SettingInstagramFeedBody']
 export type LeadStatus = Schemas['LeadStatus']
 export type LeadEmailStatus = Schemas['LeadEmailStatus']
 export type LeadCounts = Schemas['LeadCounts']
+export type LeadEventType = Schemas['LeadEventType']
+export type LeadEvent = Schemas['LeadEvent']
+export type LeadContactBody = Schemas['LeadContactBody']
 export type AdminLeadTourRef = Schemas['AdminLeadTourRef']
 export type AdminLeadDestinationRef = Schemas['AdminLeadDestinationRef']
 export type AdminInquiry = Schemas['AdminInquiry']
 export type AdminInquiryListItem = Schemas['AdminInquiryListItem']
 export type AdminInquiryList = Schemas['AdminInquiryList']
+export type AdminInquiryCreateBody = Schemas['AdminInquiryCreateBody']
 export type InquiryUpdateBody = Schemas['InquiryUpdateBody']
 export type AdminProposal = Schemas['AdminProposal']
 export type AdminProposalListItem = Schemas['AdminProposalListItem']
@@ -195,6 +199,8 @@ export interface InquiryBody {
   /** Honeypot — must stay empty. */
   website?: string
   turnstileToken?: string
+  /** Same random id for every retry of one submission — the API returns the saved inquiry instead of a duplicate. */
+  clientRequestId?: string
 }
 
 /** 201 response of POST /inquiries. */
@@ -219,6 +225,8 @@ export interface ProposalBody {
   locale: Locale
   website?: string
   turnstileToken?: string
+  /** Same random id for every retry of one submission — the API returns the saved proposal instead of a duplicate. */
+  clientRequestId?: string
   /** PDF or DOCX, ≤ 5 MB */
   attachment?: File | null
 }
@@ -236,6 +244,7 @@ export interface NewsletterSubscribeBody {
   locale: Locale
   source?: string
   website?: string
+  turnstileToken?: string
 }
 
 export interface NewsletterSubscribeResult {

@@ -1442,6 +1442,7 @@ export interface paths {
          *     | locale | optional, en / zh / de (default en) |
          *     | website | honeypot — leave empty |
          *     | turnstileToken | Cloudflare Turnstile token (required only when Turnstile is enabled) |
+         *     | clientRequestId | optional idempotency key (8–64 chars) so retries return the same reference |
          *     | attachment | optional file, PDF or DOCX, ≤ 5 MB (checked by content, not by extension) |
          *
          *     Errors: 400 VALIDATION_ERROR with `details: [{ path, message }]`, 413 when the attachment is larger than 5 MB,
@@ -6774,12 +6775,20 @@ export interface paths {
                     from?: string;
                     /** @description Created on or before (YYYY-MM-DD, UTC) */
                     to?: string;
-                    /** @description Search name, email, reference and message */
+                    /** @description Search name, email, WhatsApp number, reference, message and notes */
                     q?: string;
+                    /** @description reply = still "new" after the promised response time (oldest first) · followUp = follow-up date today or earlier */
+                    due?: "reply" | "followUp";
+                    /** @description Default newest first (oldest first with due=reply) */
+                    sort?: "newest" | "oldest";
                     /** @description Tour id */
                     tour?: string;
                     /** @description Exact country (case-insensitive) */
                     country?: string;
+                    /** @description Destination id */
+                    destination?: string;
+                    /** @description "missing" = the notification email to the guide never arrived */
+                    guideEmail?: "missing";
                     page?: number;
                     pageSize?: number;
                 };
@@ -6846,7 +6855,76 @@ export interface paths {
             };
         };
         put?: never;
-        post?: never;
+        /** Log a manual inquiry or booking (WhatsApp, phone, referral…) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AdminInquiryCreateBodyInput"];
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminInquiry"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -6869,12 +6947,20 @@ export interface paths {
                     from?: string;
                     /** @description Created on or before (YYYY-MM-DD, UTC) */
                     to?: string;
-                    /** @description Search name, email, reference and message */
+                    /** @description Search name, email, WhatsApp number, reference, message and notes */
                     q?: string;
+                    /** @description reply = still "new" after the promised response time (oldest first) · followUp = follow-up date today or earlier */
+                    due?: "reply" | "followUp";
+                    /** @description Default newest first (oldest first with due=reply) */
+                    sort?: "newest" | "oldest";
                     /** @description Tour id */
                     tour?: string;
                     /** @description Exact country (case-insensitive) */
                     country?: string;
+                    /** @description Destination id */
+                    destination?: string;
+                    /** @description "missing" = the notification email to the guide never arrived */
+                    guideEmail?: "missing";
                 };
                 header?: never;
                 path?: never;
@@ -7091,7 +7177,7 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        /** Update status and/or internal notes */
+        /** Update status, follow-up, booking dates and/or internal notes */
         patch: {
             parameters: {
                 query?: never;
@@ -7163,6 +7249,93 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/api/v1/admin/inquiries/{id}/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Log a contact with the guest (moves "new" to "replied") */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["LeadContactBodyInput"];
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminInquiry"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/inquiries/{id}/resend-emails": {
@@ -7267,8 +7440,14 @@ export interface paths {
                     from?: string;
                     /** @description Created on or before (YYYY-MM-DD, UTC) */
                     to?: string;
-                    /** @description Search company, contact person, email and reference */
+                    /** @description Search company, contact person, email, phone, reference, brief and notes */
                     q?: string;
+                    /** @description reply = still "new" after the promised response time (oldest first) · followUp = follow-up date today or earlier */
+                    due?: "reply" | "followUp";
+                    /** @description Default newest first (oldest first with due=reply) */
+                    sort?: "newest" | "oldest";
+                    /** @description "missing" = the notification email to the guide never arrived */
+                    guideEmail?: "missing";
                     page?: number;
                     pageSize?: number;
                 };
@@ -7358,8 +7537,14 @@ export interface paths {
                     from?: string;
                     /** @description Created on or before (YYYY-MM-DD, UTC) */
                     to?: string;
-                    /** @description Search company, contact person, email and reference */
+                    /** @description Search company, contact person, email, phone, reference, brief and notes */
                     q?: string;
+                    /** @description reply = still "new" after the promised response time (oldest first) · followUp = follow-up date today or earlier */
+                    due?: "reply" | "followUp";
+                    /** @description Default newest first (oldest first with due=reply) */
+                    sort?: "newest" | "oldest";
+                    /** @description "missing" = the notification email to the guide never arrived */
+                    guideEmail?: "missing";
                 };
                 header?: never;
                 path?: never;
@@ -7576,7 +7761,7 @@ export interface paths {
         };
         options?: never;
         head?: never;
-        /** Update status and/or internal notes */
+        /** Update status, follow-up and/or internal notes */
         patch: {
             parameters: {
                 query?: never;
@@ -7727,6 +7912,93 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/proposals/{id}/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Log a contact with the client (moves "new" to "replied") */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["LeadContactBodyInput"];
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminProposal"];
+                    };
+                };
+                /** @description Default Response */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Default Response */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Default Response */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Default Response */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Default Response */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -11861,8 +12133,23 @@ export interface components {
         AdminPageContentInput: {
             items: components["schemas"]["PageContentEntryInput"][];
         };
+        /**
+         * @description new → replied → proposal_sent → confirmed (booked), or lost / cancelled
+         * @enum {string}
+         */
+        LeadStatusInput: "new" | "replied" | "proposal_sent" | "confirmed" | "lost" | "cancelled";
         /** @enum {string} */
-        LeadStatusInput: "new" | "replied" | "closed";
+        LeadEventTypeInput: "status" | "note" | "contact" | "follow_up" | "booking";
+        LeadEventInput: {
+            id: string;
+            type: components["schemas"]["LeadEventTypeInput"];
+            fromStatus: components["schemas"]["LeadStatusInput"] | null;
+            toStatus: components["schemas"]["LeadStatusInput"] | null;
+            /** @description note: the notes as saved · contact: "<channel>: <note>" · follow_up: YYYY-MM-DD or null */
+            text: string | null;
+            actorName: string | null;
+            createdAt: string;
+        };
         /**
          * @description sent = guide + visitor email delivered, partial = only one, failed = none after an attempt
          * @enum {string}
@@ -11872,8 +12159,16 @@ export interface components {
         LeadCountsInput: {
             new: number;
             replied: number;
-            closed: number;
+            proposal_sent: number;
+            confirmed: number;
+            lost: number;
+            cancelled: number;
             total: number;
+        };
+        LeadContactBodyInput: {
+            /** @enum {string} */
+            channel: "whatsapp" | "email" | "phone" | "meeting" | "other";
+            note?: string | null;
         };
         InquiryBodyInput: {
             name: string;
@@ -11907,6 +12202,7 @@ export interface components {
             website?: string;
             /** @description Cloudflare Turnstile token (when enabled) */
             turnstileToken?: string;
+            clientRequestId?: ("" | string) | null;
         };
         InquiryResultInput: {
             /** @example SRD-2026-0042 */
@@ -11948,6 +12244,17 @@ export interface components {
             sourcePage: string | null;
             locale: string;
             status: components["schemas"]["LeadStatusInput"];
+            /** @description First reply (left "new") */
+            repliedAt: string | null;
+            lastContactAt: string;
+            /** @description YYYY-MM-DD */
+            followUpAt: string | null;
+            /** @description Still "new" after the promised response time */
+            replyOverdue: boolean;
+            /** @description YYYY-MM-DD (confirmed journey) */
+            bookedStart: string | null;
+            /** @description YYYY-MM-DD (confirmed journey) */
+            bookedEnd: string | null;
             emailStatus: components["schemas"]["LeadEmailStatusInput"];
             hasNotes: boolean;
             createdAt: string;
@@ -11988,6 +12295,29 @@ export interface components {
             locale: string;
             status: components["schemas"]["LeadStatusInput"];
             internalNotes: string | null;
+            /** @description First reply (left "new") */
+            repliedAt: string | null;
+            confirmedAt: string | null;
+            /** @description Became lost / cancelled */
+            closedAt: string | null;
+            lastContactAt: string;
+            /** @description YYYY-MM-DD */
+            followUpAt: string | null;
+            lostReason: string | null;
+            /** @description Still "new" after the promised response time */
+            replyOverdue: boolean;
+            /** @description YYYY-MM-DD — dates of the confirmed journey */
+            bookedStart: string | null;
+            /** @description YYYY-MM-DD */
+            bookedEnd: string | null;
+            /** @description The busy range this booking added to the availability calendar */
+            calendarBlock: {
+                id: string;
+                startDate: string;
+                endDate: string;
+            } | null;
+            /** @description History, newest first (up to 100) */
+            events: components["schemas"]["LeadEventInput"][];
             emailStatus: components["schemas"]["LeadEmailStatusInput"];
             guideEmailSentAt: string | null;
             visitorEmailSentAt: string | null;
@@ -11999,6 +12329,45 @@ export interface components {
         InquiryUpdateBodyInput: {
             status?: components["schemas"]["LeadStatusInput"];
             internalNotes?: string | null;
+            /** @description Follow-up reminder date (YYYY-MM-DD); null clears it. Cleared automatically when the lead is lost / cancelled. */
+            followUpAt?: ("" | string) | null;
+            /** @description Why the lead was lost / cancelled (kept only for those statuses) */
+            lostReason?: string | null;
+            /** @description Dates of the confirmed journey; null clears them */
+            bookedStart?: string | null;
+            bookedEnd?: string | null;
+            /** @description Keep a busy range on the availability calendar while the inquiry is confirmed (default: on when confirming). Without booked dates the visitor's exact travel dates are used. */
+            blockCalendar?: boolean;
+        };
+        AdminInquiryCreateBodyInput: {
+            name: string;
+            email?: string;
+            whatsapp?: string | null;
+            country?: string | null;
+            partyType?: components["schemas"]["TravellerTypeInput"] | null;
+            adults?: number;
+            children?: number;
+            travelStart?: string | null;
+            travelEnd?: string | null;
+            travelWindow?: string | null;
+            flexibleDates?: boolean;
+            durationPreference?: string | null;
+            pace?: string | null;
+            stayStyle?: string | null;
+            interests?: string[];
+            tourId?: string | null;
+            destinationId?: string | null;
+            status?: components["schemas"]["LeadStatusInput"];
+            /** @enum {string} */
+            channel?: "whatsapp" | "phone" | "email" | "referral" | "other";
+            followUpAt?: string | null;
+            bookedStart?: string | null;
+            bookedEnd?: string | null;
+            blockCalendar?: boolean;
+            message?: string | null;
+            internalNotes?: string | null;
+            /** @enum {string} */
+            locale?: "en" | "zh" | "de";
         };
         ProposalResultInput: {
             /** @example SRD-C-2026-0007 */
@@ -12032,6 +12401,13 @@ export interface components {
             sourcePage: string | null;
             locale: string;
             status: components["schemas"]["LeadStatusInput"];
+            /** @description First reply (left "new") */
+            repliedAt: string | null;
+            lastContactAt: string;
+            /** @description YYYY-MM-DD */
+            followUpAt: string | null;
+            /** @description Still "new" after the promised response time */
+            replyOverdue: boolean;
             emailStatus: components["schemas"]["LeadEmailStatusInput"];
             hasNotes: boolean;
             createdAt: string;
@@ -12059,6 +12435,19 @@ export interface components {
             locale: string;
             status: components["schemas"]["LeadStatusInput"];
             internalNotes: string | null;
+            /** @description First reply (left "new") */
+            repliedAt: string | null;
+            confirmedAt: string | null;
+            /** @description Became lost / cancelled */
+            closedAt: string | null;
+            lastContactAt: string;
+            /** @description YYYY-MM-DD */
+            followUpAt: string | null;
+            lostReason: string | null;
+            /** @description Still "new" after the promised response time */
+            replyOverdue: boolean;
+            /** @description History, newest first (up to 100) */
+            events: components["schemas"]["LeadEventInput"][];
             emailStatus: components["schemas"]["LeadEmailStatusInput"];
             guideEmailSentAt: string | null;
             visitorEmailSentAt: string | null;
@@ -12070,6 +12459,10 @@ export interface components {
         ProposalUpdateBodyInput: {
             status?: components["schemas"]["LeadStatusInput"];
             internalNotes?: string | null;
+            /** @description Follow-up reminder date (YYYY-MM-DD); null clears it. Cleared automatically when the lead is lost / cancelled. */
+            followUpAt?: ("" | string) | null;
+            /** @description Why the lead was lost / cancelled (kept only for those statuses) */
+            lostReason?: string | null;
         };
         NewsletterSubscribeBodyInput: {
             email: string;
@@ -12081,6 +12474,8 @@ export interface components {
             source?: ("" | string) | null;
             /** @description Honeypot — leave empty */
             website?: string;
+            /** @description Cloudflare Turnstile token (when enabled) */
+            turnstileToken?: string;
         };
         NewsletterSubscribeResultInput: {
             /**
@@ -12264,9 +12659,12 @@ export interface components {
                 byStatus: {
                     new: number;
                     replied: number;
-                    closed: number;
+                    proposal_sent: number;
+                    confirmed: number;
+                    lost: number;
+                    cancelled: number;
                 };
-                /** @description (replied + closed) / total, 0 when there are none */
+                /** @description (replied + proposal_sent + confirmed) / total, 0 when there are none */
                 conversionRate: number;
                 /** @description Last 12 months (UTC), oldest first, including months without inquiries */
                 byMonth: {
@@ -12306,6 +12704,11 @@ export interface components {
             newsletter: {
                 confirmed: number;
                 pending: number;
+            };
+            /** @description Leads whose notification email to the guide never arrived (older than 5 minutes) */
+            emailAlerts: {
+                inquiries: number;
+                proposals: number;
             };
         };
         ErrorResponse: {
@@ -14511,8 +14914,23 @@ export interface components {
         AdminPageContent: {
             items: components["schemas"]["PageContentEntry"][];
         };
+        /**
+         * @description new → replied → proposal_sent → confirmed (booked), or lost / cancelled
+         * @enum {string}
+         */
+        LeadStatus: "new" | "replied" | "proposal_sent" | "confirmed" | "lost" | "cancelled";
         /** @enum {string} */
-        LeadStatus: "new" | "replied" | "closed";
+        LeadEventType: "status" | "note" | "contact" | "follow_up" | "booking";
+        LeadEvent: {
+            id: string;
+            type: components["schemas"]["LeadEventType"];
+            fromStatus: components["schemas"]["LeadStatus"] | null;
+            toStatus: components["schemas"]["LeadStatus"] | null;
+            /** @description note: the notes as saved · contact: "<channel>: <note>" · follow_up: YYYY-MM-DD or null */
+            text: string | null;
+            actorName: string | null;
+            createdAt: string;
+        };
         /**
          * @description sent = guide + visitor email delivered, partial = only one, failed = none after an attempt
          * @enum {string}
@@ -14522,8 +14940,16 @@ export interface components {
         LeadCounts: {
             new: number;
             replied: number;
-            closed: number;
+            proposal_sent: number;
+            confirmed: number;
+            lost: number;
+            cancelled: number;
             total: number;
+        };
+        LeadContactBody: {
+            /** @enum {string} */
+            channel: "whatsapp" | "email" | "phone" | "meeting" | "other";
+            note?: string | null;
         };
         InquiryBody: {
             name: string;
@@ -14558,6 +14984,7 @@ export interface components {
             website?: string;
             /** @description Cloudflare Turnstile token (when enabled) */
             turnstileToken?: string;
+            clientRequestId: unknown;
         };
         InquiryResult: {
             /** @example SRD-2026-0042 */
@@ -14599,6 +15026,17 @@ export interface components {
             sourcePage: string | null;
             locale: string;
             status: components["schemas"]["LeadStatus"];
+            /** @description First reply (left "new") */
+            repliedAt: string | null;
+            lastContactAt: string;
+            /** @description YYYY-MM-DD */
+            followUpAt: string | null;
+            /** @description Still "new" after the promised response time */
+            replyOverdue: boolean;
+            /** @description YYYY-MM-DD (confirmed journey) */
+            bookedStart: string | null;
+            /** @description YYYY-MM-DD (confirmed journey) */
+            bookedEnd: string | null;
             emailStatus: components["schemas"]["LeadEmailStatus"];
             hasNotes: boolean;
             createdAt: string;
@@ -14639,6 +15077,29 @@ export interface components {
             locale: string;
             status: components["schemas"]["LeadStatus"];
             internalNotes: string | null;
+            /** @description First reply (left "new") */
+            repliedAt: string | null;
+            confirmedAt: string | null;
+            /** @description Became lost / cancelled */
+            closedAt: string | null;
+            lastContactAt: string;
+            /** @description YYYY-MM-DD */
+            followUpAt: string | null;
+            lostReason: string | null;
+            /** @description Still "new" after the promised response time */
+            replyOverdue: boolean;
+            /** @description YYYY-MM-DD — dates of the confirmed journey */
+            bookedStart: string | null;
+            /** @description YYYY-MM-DD */
+            bookedEnd: string | null;
+            /** @description The busy range this booking added to the availability calendar */
+            calendarBlock: {
+                id: string;
+                startDate: string;
+                endDate: string;
+            } | null;
+            /** @description History, newest first (up to 100) */
+            events: components["schemas"]["LeadEvent"][];
             emailStatus: components["schemas"]["LeadEmailStatus"];
             guideEmailSentAt: string | null;
             visitorEmailSentAt: string | null;
@@ -14650,6 +15111,45 @@ export interface components {
         InquiryUpdateBody: {
             status?: components["schemas"]["LeadStatus"];
             internalNotes?: string | null;
+            /** @description Follow-up reminder date (YYYY-MM-DD); null clears it. Cleared automatically when the lead is lost / cancelled. */
+            followUpAt?: string | null;
+            /** @description Why the lead was lost / cancelled (kept only for those statuses) */
+            lostReason?: string | null;
+            /** @description Dates of the confirmed journey; null clears them */
+            bookedStart?: string | null;
+            bookedEnd?: string | null;
+            /** @description Keep a busy range on the availability calendar while the inquiry is confirmed (default: on when confirming). Without booked dates the visitor's exact travel dates are used. */
+            blockCalendar?: boolean;
+        };
+        AdminInquiryCreateBody: {
+            name: string;
+            email?: "" | string;
+            whatsapp?: string | null;
+            country?: string | null;
+            partyType?: components["schemas"]["TravellerType"] | null;
+            adults?: number;
+            children?: number;
+            travelStart?: string | null;
+            travelEnd?: string | null;
+            travelWindow?: string | null;
+            flexibleDates?: boolean;
+            durationPreference?: string | null;
+            pace?: string | null;
+            stayStyle?: string | null;
+            interests?: string[];
+            tourId?: string | null;
+            destinationId?: string | null;
+            status?: components["schemas"]["LeadStatus"];
+            /** @enum {string} */
+            channel?: "whatsapp" | "phone" | "email" | "referral" | "other";
+            followUpAt?: string | null;
+            bookedStart?: string | null;
+            bookedEnd?: string | null;
+            blockCalendar?: boolean;
+            message?: string | null;
+            internalNotes?: string | null;
+            /** @enum {string} */
+            locale?: "en" | "zh" | "de";
         };
         ProposalResult: {
             /** @example SRD-C-2026-0007 */
@@ -14683,6 +15183,13 @@ export interface components {
             sourcePage: string | null;
             locale: string;
             status: components["schemas"]["LeadStatus"];
+            /** @description First reply (left "new") */
+            repliedAt: string | null;
+            lastContactAt: string;
+            /** @description YYYY-MM-DD */
+            followUpAt: string | null;
+            /** @description Still "new" after the promised response time */
+            replyOverdue: boolean;
             emailStatus: components["schemas"]["LeadEmailStatus"];
             hasNotes: boolean;
             createdAt: string;
@@ -14710,6 +15217,19 @@ export interface components {
             locale: string;
             status: components["schemas"]["LeadStatus"];
             internalNotes: string | null;
+            /** @description First reply (left "new") */
+            repliedAt: string | null;
+            confirmedAt: string | null;
+            /** @description Became lost / cancelled */
+            closedAt: string | null;
+            lastContactAt: string;
+            /** @description YYYY-MM-DD */
+            followUpAt: string | null;
+            lostReason: string | null;
+            /** @description Still "new" after the promised response time */
+            replyOverdue: boolean;
+            /** @description History, newest first (up to 100) */
+            events: components["schemas"]["LeadEvent"][];
             emailStatus: components["schemas"]["LeadEmailStatus"];
             guideEmailSentAt: string | null;
             visitorEmailSentAt: string | null;
@@ -14721,6 +15241,10 @@ export interface components {
         ProposalUpdateBody: {
             status?: components["schemas"]["LeadStatus"];
             internalNotes?: string | null;
+            /** @description Follow-up reminder date (YYYY-MM-DD); null clears it. Cleared automatically when the lead is lost / cancelled. */
+            followUpAt?: string | null;
+            /** @description Why the lead was lost / cancelled (kept only for those statuses) */
+            lostReason?: string | null;
         };
         NewsletterSubscribeBody: {
             /** Format: email */
@@ -14733,6 +15257,8 @@ export interface components {
             source: unknown;
             /** @description Honeypot — leave empty */
             website?: string;
+            /** @description Cloudflare Turnstile token (when enabled) */
+            turnstileToken?: string;
         };
         NewsletterSubscribeResult: {
             /**
@@ -14916,9 +15442,12 @@ export interface components {
                 byStatus: {
                     new: number;
                     replied: number;
-                    closed: number;
+                    proposal_sent: number;
+                    confirmed: number;
+                    lost: number;
+                    cancelled: number;
                 };
-                /** @description (replied + closed) / total, 0 when there are none */
+                /** @description (replied + proposal_sent + confirmed) / total, 0 when there are none */
                 conversionRate: number;
                 /** @description Last 12 months (UTC), oldest first, including months without inquiries */
                 byMonth: {
@@ -14958,6 +15487,11 @@ export interface components {
             newsletter: {
                 confirmed: number;
                 pending: number;
+            };
+            /** @description Leads whose notification email to the guide never arrived (older than 5 minutes) */
+            emailAlerts: {
+                inquiries: number;
+                proposals: number;
             };
         };
     };

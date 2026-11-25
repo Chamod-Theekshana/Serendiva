@@ -20,7 +20,7 @@ import { StoriesSection } from '@/components/home/StoriesSection'
 import { TrustStrip } from '@/components/home/TrustStrip'
 import { FinalCta } from '@/components/sections/FinalCta'
 import { travelAgencyJsonLd } from '@/components/seo/jsonld'
-import { JsonLd } from '@/components/seo/JsonLd'
+import { JsonLd } from '@/components/seo/JsonLdScript'
 
 /** Settings are already fetched by the (site) layout — React `cache` dedupes this call within the request. */
 async function loadSettings(locale: Locale): Promise<PublicSettings | null> {

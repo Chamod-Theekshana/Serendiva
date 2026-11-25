@@ -1,12 +1,12 @@
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import { getAvailability } from '@/lib/api/public'
-import type { ApiImage, Locale } from '@/lib/api/types'
-import { AvailabilityCalendar } from '@/components/sections/AvailabilityCalendar'
+import type { ApiImage, AvailabilityCalendar as AvailabilityCalendarDto, Locale } from '@/lib/api/types'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { Icon } from '@/components/ui/Icon'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { SmartImage } from '@/components/ui/SmartImage'
+import { ContactAvailabilityClient } from './ContactAvailabilityClient'
 
 /* Smaller /contact pieces around the wizard: trust badges, editorial photo and the availability calendar. */
 
@@ -63,12 +63,18 @@ export function EditorialPhoto({ image }: { image: ApiImage | null }) {
   )
 }
 
-/** Read-only availability calendar (GET /availability). */
-export async function ContactAvailability({ locale }: { locale: Locale }) {
+/** Interactive availability calendar (GET /availability). */
+export async function ContactAvailability({
+  locale,
+  calendar: initialCalendar,
+}: {
+  locale: Locale
+  calendar?: AvailabilityCalendarDto | null
+}) {
   const t = await getTranslations({ locale, namespace: 'contact.concierge' })
-  const calendar = await getAvailability().catch(() => null)
+  const calendar = initialCalendar !== undefined ? initialCalendar : await getAvailability().catch(() => null)
   if (!calendar) return <ErrorState />
-  return <AvailabilityCalendar calendar={calendar} monthsToShow={1} title={t('availabilityTitle')} />
+  return <ContactAvailabilityClient calendar={calendar} title={t('availabilityTitle')} />
 }
 
 export function AvailabilitySkeleton() {

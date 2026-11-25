@@ -7,6 +7,7 @@ export const ICON_NAMES = [
   'accessible',
   'account_balance',
   'add',
+  'add_comment',
   'add_photo_alternate',
   'ads_click',
   'agriculture',
@@ -238,6 +239,7 @@ export const ICON_NAMES = [
   'luggage',
   'magic_button',
   'mail',
+  'mail_lock',
   'map',
   'mark_email_read',
   'mark_email_unread',
@@ -289,6 +291,7 @@ export const ICON_NAMES = [
   'pin_drop',
   'play_arrow',
   'play_circle',
+  'playlist_add',
   'policy',
   'pool',
   'print',
@@ -417,4 +420,4 @@ export const ICON_NAMES = [
 export type IconName = (typeof ICON_NAMES)[number]
 
 /** Content hash of the sprite — appended as ?v= so browsers never use a stale cached sprite. */
-export const ICON_SPRITE_VERSION = '9f9c1a789d'
+export const ICON_SPRITE_VERSION = '4b87ff35ad'

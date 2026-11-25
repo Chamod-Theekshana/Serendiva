@@ -1,10 +1,16 @@
 'use client'
 
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { Button } from '@/components/admin/kit/Button'
 import { DetailList, DetailSection } from '@/components/admin/kit/DetailList'
+import { DateField } from '@/components/admin/kit/form/DateField'
+import { Switch } from '@/components/admin/kit/form/Switch'
 import { Icon } from '@/components/ui/Icon'
+import { invalidateAdminQueries, useAdminMutation } from '@/lib/admin/hooks'
 import { inquiriesApi } from '@/lib/admin/leads'
-import type { AdminInquiry } from '@/lib/api/types'
+import { toast } from '@/lib/admin/toast'
+import type { AdminInquiry, InquiryUpdateBody } from '@/lib/api/types'
 import { ChipList, ContactValue, LeadDrawer } from './LeadDrawer'
 import { useLeadFormat } from './useLeadFormat'
 
@@ -19,17 +25,25 @@ export function InquiryDrawer({ id, onClose }: { id: string | null; onClose: () 
       title={(lead) => lead.name}
       replyName={(lead) => lead.name}
       replyPhone={(lead) => lead.whatsapp}
-      renderDetails={(lead) => <InquiryDetails lead={lead} />}
+      renderDetails={(lead, { onUpdated }) => <InquiryDetails lead={lead} onUpdated={onUpdated} />}
     />
   )
 }
 
-function InquiryDetails({ lead }: { lead: AdminInquiry }) {
+function InquiryDetails({ lead, onUpdated }: { lead: AdminInquiry; onUpdated: (updated: AdminInquiry) => void }) {
   const t = useTranslations('admin.leads')
   const f = useLeadFormat()
   const travel = f.travel(lead)
   return (
     <>
+      <DetailSection title={t('sections.booking')} icon="calendar_month">
+        <InquiryBookingEditor
+          key={`${lead.id}-${lead.bookedStart ?? ''}-${lead.bookedEnd ?? ''}-${lead.calendarBlock?.id ?? ''}-${lead.status}`}
+          lead={lead}
+          onUpdated={onUpdated}
+        />
+      </DetailSection>
+
       <DetailSection title={t('sections.trip')} icon="luggage">
         <DetailList
           items={[
@@ -59,12 +73,10 @@ function InquiryDetails({ lead }: { lead: AdminInquiry }) {
                 : null,
             },
             {
+              // The visitor's own answer ("Flexible within ±3–5 days", "Fixed exact dates…") whenever there is one;
+              // older inquiries only have the yes/no flag.
               label: t('fields.flexible'),
-              value: lead.flexibleDates
-                ? lead.flexibility
-                  ? `${t('yes')} — ${lead.flexibility}`
-                  : t('yes')
-                : t('no'),
+              value: lead.flexibility ?? (lead.flexibleDates ? t('yes') : t('no')),
             },
             { label: t('fields.duration'), value: lead.durationPreference },
             { label: t('fields.pace'), value: lead.pace },
@@ -92,7 +104,9 @@ function InquiryDetails({ lead }: { lead: AdminInquiry }) {
           items={[
             {
               label: t('fields.email'),
-              value: <ContactValue value={lead.email} href={`mailto:${lead.email}`} copyLabel={t('copyEmail')} />,
+              value: lead.email ? (
+                <ContactValue value={lead.email} href={`mailto:${lead.email}`} copyLabel={t('copyEmail')} />
+              ) : null,
               wide: true,
             },
             {
@@ -114,5 +128,99 @@ function InquiryDetails({ lead }: { lead: AdminInquiry }) {
         )}
       </DetailSection>
     </>
+  )
+}
+
+function InquiryBookingEditor({
+  lead,
+  onUpdated,
+}: {
+  lead: AdminInquiry
+  onUpdated: (updated: AdminInquiry) => void
+}) {
+  const t = useTranslations('admin.leads.booking')
+  const f = useLeadFormat()
+  const initialStart = lead.bookedStart ?? lead.travelStart ?? ''
+  const initialEnd = lead.bookedEnd ?? lead.travelEnd ?? ''
+  const hasBlock = lead.calendarBlock !== null
+  const [start, setStart] = useState(initialStart)
+  const [end, setEnd] = useState(initialEnd)
+  const [blockCalendar, setBlockCalendar] = useState(
+    hasBlock || (lead.status === 'confirmed' && !lead.bookedStart && !lead.travelStart),
+  )
+  const [error, setError] = useState<string | null>(null)
+
+  const save = useAdminMutation((body: InquiryUpdateBody) => inquiriesApi.update(lead.id, body), {
+    onSuccess: (updated) => {
+      onUpdated(updated)
+      invalidateAdminQueries('availability')
+    },
+  })
+
+  const dirty =
+    start !== (lead.bookedStart ?? '') ||
+    end !== (lead.bookedEnd ?? '') ||
+    (lead.status === 'confirmed' && Boolean(start && end) && blockCalendar !== hasBlock)
+
+  const onSave = async () => {
+    setError(null)
+    if ((start && !end) || (!start && end) || (start && end && end < start)) {
+      setError(t('datesError'))
+      return
+    }
+    const res = await save.mutate({
+      bookedStart: start || null,
+      bookedEnd: end || null,
+      ...(lead.status === 'confirmed' ? { blockCalendar } : {}),
+    })
+    if (res.ok) toast.success(start ? t('saved') : t('cleared'))
+  }
+
+  const onClear = async () => {
+    setError(null)
+    const res = await save.mutate({ bookedStart: null, bookedEnd: null })
+    if (res.ok) toast.success(t('cleared'))
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <DateField label={t('start')} value={start} onChange={setStart} />
+        <DateField label={t('end')} value={end} min={start || undefined} onChange={setEnd} />
+      </div>
+      {error && (
+        <p role="alert" className="flex items-center gap-1 font-caption text-caption text-error">
+          <Icon name="error" className="text-[15px]" />
+          {error}
+        </p>
+      )}
+      {lead.status === 'confirmed' ? (
+        <Switch
+          size="sm"
+          checked={blockCalendar}
+          onCheckedChange={setBlockCalendar}
+          label={t('blockCalendar')}
+          description={t('blockCalendarHint')}
+        />
+      ) : (
+        <p className="font-caption text-caption text-on-surface-variant">{t('confirmHint')}</p>
+      )}
+      {lead.calendarBlock && (
+        <p className="flex items-center gap-1.5 font-caption text-caption font-medium text-tertiary">
+          <Icon name="event_available" className="text-[15px]" />
+          {t('blockedRange', { range: f.calendarRange(lead.calendarBlock.startDate, lead.calendarBlock.endDate) })}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="secondary" icon="save" disabled={!dirty} loading={save.pending} onClick={() => void onSave()}>
+          {t('save')}
+        </Button>
+        {(lead.bookedStart || lead.bookedEnd) && (
+          <Button size="sm" variant="ghost" disabled={save.pending} onClick={() => void onClear()}>
+            {t('clear')}
+          </Button>
+        )}
+      </div>
+    </div>
   )
 }

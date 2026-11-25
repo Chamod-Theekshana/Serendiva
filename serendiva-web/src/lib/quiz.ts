@@ -392,20 +392,33 @@ const SEASON_MONTHS: Record<Exclude<QuizSeason, 'flexible'>, { start: number; le
   'jul-aug': { start: 6, length: 2 },
 }
 
+const isoMonth = (index: number) => `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`
+
 /**
- * The /contact `month` prefill for a season: the first month from next month onwards that falls inside the season,
- * as 'YYYY-MM' (the inquiry wizard maps it onto its travel-window options), or 'flexible'.
+ * The /contact `month` prefill for a season: the next stretch of it from next month onwards, as a month range
+ * 'YYYY-MM/YYYY-MM' (e.g. "May – Sep" in November → "2027-05/2027-09"). The inquiry wizard shows exactly this
+ * range (it no longer falls into one of its own seasons by its first month). 'flexible' for no preference.
  */
 export function seasonMonth(season: QuizSeason, today: Date = new Date()): string {
   if (season === 'flexible') return 'flexible'
   const { start, length } = SEASON_MONTHS[season]
   const current = today.getUTCFullYear() * 12 + today.getUTCMonth()
+  const inSeason = (index: number) => ((index % 12) - start + 12) % 12 < length
   for (let index = current + 1; index <= current + 12; index++) {
-    if (((index % 12) - start + 12) % 12 < length) {
-      return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`
-    }
+    if (!inSeason(index)) continue
+    let end = index
+    while (end + 1 < index + length && inSeason(end + 1)) end++
+    return `${isoMonth(index)}/${isoMonth(end)}`
   }
   return 'flexible'
+}
+
+/** Quiz duration bands → the wizard's trip-length choices (nearest band). */
+const DURATION_FOR_WIZARD: Record<DurationBand, NonNullable<ContactPrefill['duration']>> = {
+  short: 'essential', // 5–7 nights → 6–8 days
+  balanced: 'indepth', // 8–10 → 9–12 days
+  deep: 'indepth', // 11–14 → 9–12 days ("my recommendation"; the guide fine-tunes)
+  grand: 'grand', // 15+ → 13+ days
 }
 
 /** /contact prefill for a quiz result: tour, interests (category slugs), season month, party, adults, source. */
@@ -421,6 +434,7 @@ export function toContactPrefill(
     month: answers.season ? seasonMonth(answers.season, today) : undefined,
     party: answers.party ?? undefined,
     adults: answers.party ? PARTY_ADULTS[answers.party] : undefined,
+    duration: answers.duration ? DURATION_FOR_WIZARD[answers.duration] : undefined,
     message,
     source: 'trip-quiz',
   }

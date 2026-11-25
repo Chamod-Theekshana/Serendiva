@@ -451,6 +451,95 @@ export function filledLocales(form: TourForm): Record<AdminLocale, boolean> {
   )
 }
 
+/** Extra helpers for duplicating tours, generating itinerary days from duration, and publish readiness. */
+export function cloneTourForDuplicate(source: AdminTour): TourForm {
+  const copy = fromAdmin(source)
+  const enTitle = `${copy.title.en} (Copy)`.slice(0, LIMITS.title)
+  const zhTitle = copy.title.zh ? `${copy.title.zh} (副本)`.slice(0, LIMITS.title) : ''
+  const deTitle = copy.title.de ? `${copy.title.de} (Kopie)`.slice(0, LIMITS.title) : ''
+  const baseSlug = source.slug.slice(0, 75).replace(/-+$/, '') || 'tour'
+  return {
+    ...copy,
+    slug: `${baseSlug}-copy`,
+    status: 'draft',
+    order: 0,
+    isFeatured: false,
+    isMostPopular: false,
+    title: { en: enTitle, zh: zhTitle, de: deTitle },
+  }
+}
+
+export function buildRemainingDays(existing: readonly DayForm[], targetCount: number): DayForm[] {
+  const clamped = Math.max(1, Math.min(LIMITS.days, Math.floor(targetCount)))
+  if (existing.length >= clamped) return [...existing]
+  const next = [...existing]
+  for (let i = existing.length; i < clamped; i++) {
+    const day = newDay()
+    day.title = { en: `Day ${i + 1}`, zh: '', de: '' }
+    next.push(day)
+  }
+  return next
+}
+
+export type TourReadinessKey =
+  | 'basics'
+  | 'description'
+  | 'cover'
+  | 'itinerary'
+  | 'classification'
+  | 'destinations'
+  | 'translations'
+
+export interface TourReadinessItem {
+  key: TourReadinessKey
+  tab: EditorTab
+  ok: boolean
+  optional?: boolean
+}
+
+export function tourReadiness(form: TourForm): TourReadinessItem[] {
+  const slug = form.slug.trim()
+  const filled = filledLocales(form)
+  return [
+    {
+      key: 'basics',
+      tab: 'details',
+      ok: Boolean(
+        form.title.en.trim() &&
+          form.summary.en.trim() &&
+          slug.length >= 2 &&
+          SLUG_PATTERN.test(slug) &&
+          form.durationDays !== null &&
+          form.durationDays >= LIMITS.duration.min &&
+          form.durationNights !== null &&
+          form.durationNights >= 0,
+      ),
+    },
+    { key: 'description', tab: 'details', ok: form.description.en.trim().length > 0 },
+    { key: 'cover', tab: 'gallery', ok: form.cover !== null },
+    {
+      key: 'itinerary',
+      tab: 'itinerary',
+      ok: form.days.length > 0 && (form.durationDays === null || form.days.length === form.durationDays),
+    },
+    {
+      key: 'classification',
+      tab: 'details',
+      ok: form.categoryIds.length > 0 && form.seasons.length > 0,
+    },
+    { key: 'destinations', tab: 'destinations', ok: form.destinationIds.length > 0 },
+    { key: 'translations', tab: 'details', ok: filled.zh || filled.de, optional: true },
+  ]
+}
+
+export function publishWarnings(form: TourForm): ('cover' | 'itinerary' | 'description')[] {
+  const missing: ('cover' | 'itinerary' | 'description')[] = []
+  if (!form.cover) missing.push('cover')
+  if (form.days.length === 0) missing.push('itinerary')
+  if (!form.description.en.trim()) missing.push('description')
+  return missing
+}
+
 /** True when the zh/de list differs from "not started" (so the editor shows the list instead of the copy prompt). */
 export const listStarted = <T>(value: LList<T>, locale: AdminLocale): boolean =>
   locale === 'en' || value[locale].length > 0 || !hasContent(value.en)

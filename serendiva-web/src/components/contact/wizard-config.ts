@@ -29,7 +29,8 @@ export type FlexibilityId = (typeof FLEXIBILITY_IDS)[number]
 export const DURATION_IDS = ['short', 'essential', 'indepth', 'grand', 'flexible'] as const
 export type DurationId = (typeof DURATION_IDS)[number]
 
-export const PACE_IDS = ['relaxed', 'balanced', 'active'] as const
+/** 'undecided' = "No preference yet" (the default — never sent to the guide as if it were a choice). */
+export const PACE_IDS = ['relaxed', 'balanced', 'active', 'undecided'] as const
 export type PaceId = (typeof PACE_IDS)[number]
 
 export const INTEREST_OPTIONS = [
@@ -51,23 +52,74 @@ export const STAY_OPTIONS = [
   { id: 'safari_pavilions', icon: 'cabin' },
   { id: 'ocean_resorts', icon: 'pool' },
   { id: 'blend', icon: 'auto_awesome' },
+  /** "No preference yet" (the default — not sent to the guide). */
+  { id: 'undecided', icon: 'help' },
 ] as const
 export type StayId = (typeof STAY_OPTIONS)[number]['id']
 export const STAY_IDS = STAY_OPTIONS.map((o) => o.id) as [StayId, ...StayId[]]
+
+export const BUDGET_OPTIONS = [
+  { id: 'comfortable', icon: 'eco' },
+  { id: 'boutique', icon: 'hotel' },
+  { id: 'luxury', icon: 'diamond' },
+  { id: 'ultra', icon: 'workspace_premium' },
+  /** "Open / undecided" (default — omitted from message unless chosen). */
+  { id: 'undecided', icon: 'help' },
+] as const
+export type BudgetId = (typeof BUDGET_OPTIONS)[number]['id']
+export const BUDGET_IDS = BUDGET_OPTIONS.map((o) => o.id) as [BudgetId, ...BudgetId[]]
+
+export const CONTACT_METHOD_OPTIONS = [
+  { id: 'any', icon: 'forum' },
+  { id: 'whatsapp', icon: 'chat' },
+  { id: 'email', icon: 'mail' },
+  { id: 'call', icon: 'call' },
+] as const
+export type ContactMethodId = (typeof CONTACT_METHOD_OPTIONS)[number]['id']
+export const CONTACT_METHOD_IDS = CONTACT_METHOD_OPTIONS.map((o) => o.id) as [ContactMethodId, ...ContactMethodId[]]
+
+export interface TourPickerOption {
+  slug: string
+  title: string
+  durationDays: number
+}
+
+export interface DestinationPickerOption {
+  slug: string
+  name: string
+  region?: string
+}
 
 /** Calling codes offered next to the WhatsApp number (message key → dial prefix). `other` = type the full number. */
 export const CALLING_CODES = [
   { key: 'gb', code: '+44' },
   { key: 'us', code: '+1' },
   { key: 'au', code: '+61' },
+  { key: 'nz', code: '+64' },
   { key: 'de', code: '+49' },
-  { key: 'fr', code: '+33' },
+  { key: 'at', code: '+43' },
   { key: 'ch', code: '+41' },
+  { key: 'fr', code: '+33' },
+  { key: 'be', code: '+32' },
   { key: 'nl', code: '+31' },
+  { key: 'it', code: '+39' },
+  { key: 'es', code: '+34' },
+  { key: 'se', code: '+46' },
+  { key: 'no', code: '+47' },
+  { key: 'dk', code: '+45' },
+  { key: 'pl', code: '+48' },
+  { key: 'ru', code: '+7' },
   { key: 'cn', code: '+86' },
-  { key: 'ae', code: '+971' },
+  { key: 'hk', code: '+852' },
+  { key: 'jp', code: '+81' },
+  { key: 'kr', code: '+82' },
   { key: 'sg', code: '+65' },
+  { key: 'my', code: '+60' },
   { key: 'in', code: '+91' },
+  { key: 'ae', code: '+971' },
+  { key: 'sa', code: '+966' },
+  { key: 'qa', code: '+974' },
+  { key: 'za', code: '+27' },
   { key: 'lk', code: '+94' },
   { key: 'other', code: 'other' },
 ] as const
@@ -156,6 +208,9 @@ export type TravelWindowOption =
       end: number
     }
   | { value: 'later'; kind: 'later'; /** First month after the last listed season. */ from: number }
+  | { value: 'flexible'; kind: 'flexible' }
+  /** A month range picked elsewhere (home hero, trip quiz) that is not one of the seasons — kept exactly. */
+  | { value: string; kind: 'range'; start: number; end: number }
   | { value: 'custom'; kind: 'custom'; label: string }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -166,37 +221,77 @@ const monthIndexOf = (iso: string) => {
   return m ? Number(m[1]) * 12 + Number(m[2]) - 1 : NaN
 }
 
+/** "2027-02/2027-04" (or a single "2027-02") → absolute month indexes; null when malformed. */
+export function parseMonthRange(text: string | undefined): { start: number; end: number } | null {
+  const m = /^(\d{4}-\d{2})(?:\/(\d{4}-\d{2}))?$/.exec(text?.trim() ?? '')
+  if (!m) return null
+  const start = monthIndexOf(m[1]!)
+  const end = m[2] ? monthIndexOf(m[2]) : start
+  return Number.isFinite(start) && Number.isFinite(end) && end >= start && end - start < 12 ? { start, end } : null
+}
+
+const rangeValue = (start: number, end: number) => `range-${monthIso(start)}-${monthIso(end)}`
+
 /**
- * Travel-window choices generated from "today" (never hard-coded years): "Immediate (next 30–60 days)", every
- * season that starts within the next `monthsAhead` months, then "From <month> onwards". `today` is 'YYYY-MM-DD'
- * (passed from the server so SSR and hydration agree).
+ * Travel-window choices generated from "today" (never hard-coded years): "Immediate (next 30–60 days)", the season
+ * we are in (when at least a month of it is left — so in December/January the current Dec–Feb is still offered),
+ * every season that starts within the next `monthsAhead` months, then "From <month> onwards".
+ * `picked` is a month range chosen elsewhere (hero, quiz): matched to a season, or added as its own option.
+ * `today` is 'YYYY-MM-DD' (passed from the server so SSR and hydration agree).
  */
-export function travelWindowOptions(today: string, monthsAhead = 18): TravelWindowOption[] {
+export function travelWindowOptions(
+  today: string,
+  monthsAhead = 18,
+  picked?: { start: number; end: number } | null,
+): TravelWindowOption[] {
   const current = monthIndexOf(today)
   const options: TravelWindowOption[] = [{ value: 'immediate', kind: 'immediate' }]
   let lastEnd = current + 2
-  for (let index = current + 1; index <= current + monthsAhead; index++) {
-    const season = SEASON_BY_START_MONTH[index % 12]
+  for (let index = current - 2; index <= current + monthsAhead; index++) {
+    const season = SEASON_BY_START_MONTH[((index % 12) + 12) % 12]
     if (!season) continue
-    options.push({ value: `season-${monthIso(index)}`, kind: 'season', season, start: index, end: index + 2 })
-    lastEnd = index + 2
+    const end = index + 2
+    const start = Math.max(index, current + 1)
+    // An ongoing season stays while at least 2 of its months are ahead (in December: Jan–Feb of Dec–Feb);
+    // the last month alone is covered by "Immediate".
+    if (start > end - 1) continue
+    options.push({ value: `season-${monthIso(start)}`, kind: 'season', season, start, end })
+    lastEnd = end
   }
   options.push({ value: 'later', kind: 'later', from: lastEnd + 1 })
+  options.push({ value: 'flexible', kind: 'flexible' })
+  if (picked && picked.end > current && !options.some((o) => o.kind === 'season' && o.start === picked.start && o.end === picked.end)) {
+    const start = Math.max(picked.start, current + 1)
+    // after "immediate", in date order
+    const at = options.findIndex((o) => o.kind !== 'immediate' && 'start' in o && o.start > start)
+    const laterIndex = options.findIndex((o) => o.kind === 'later')
+    const option: TravelWindowOption = { value: rangeValue(start, picked.end), kind: 'range', start, end: picked.end }
+    options.splice(at === -1 ? (laterIndex === -1 ? options.length : laterIndex) : at, 0, option)
+  }
   return options
 }
 
-/** Default selection: the next peak dry season (Dec–Feb), like the Stitch design. */
-export function defaultTravelWindow(options: readonly TravelWindowOption[]): string {
-  const dec = options.find((o) => o.kind === 'season' && o.season === 'dec')
-  return (dec ?? options[1] ?? options[0])?.value ?? 'immediate'
+/**
+ * The option for a prefilled range ("2027-02/2027-04" from the hero / quiz): the season with exactly these months,
+ * else the matching "range" option (see travelWindowOptions' `picked`). Null when there is none.
+ */
+export function travelWindowForRange(month: string, options: readonly TravelWindowOption[]): string | null {
+  const range = parseMonthRange(month)
+  if (!range || !month.includes('/')) return null
+  const match =
+    options.find((o) => (o.kind === 'season' || o.kind === 'range') && o.start === range.start && o.end === range.end) ??
+    options.find((o) => o.kind === 'range' && o.end === range.end && o.start >= range.start) ??
+    options.find((o) => o.kind === 'season' && o.end === range.end && o.start >= range.start)
+  return match?.value ?? null
 }
 
 /**
  * Maps a prefilled `month` ('YYYY-MM' or a free label) onto the generated options:
  * within the next ~2 months → immediate · inside a season → that season · beyond → later · past → null.
- * Free labels (e.g. "flexible") return null; the caller decides what to do with them.
+ * "flexible" selects the explicit flexible option; other free labels return null.
  */
 export function travelWindowForMonth(month: string, today: string, options: readonly TravelWindowOption[]) {
+  if (month.trim().toLowerCase() === 'flexible') return 'flexible'
   if (!/^\d{4}-\d{2}$/.test(month)) return null
   const index = monthIndexOf(month)
   const current = monthIndexOf(today)

@@ -15,6 +15,7 @@ import { ErrorPanel } from '@/components/admin/kit/Panels'
 import { Icon } from '@/components/ui/Icon'
 import { useAdminQuery } from '@/lib/admin/hooks'
 import type { AdminLocale } from '@/lib/admin/translatable'
+import { cn } from '@/lib/utils'
 import { categoriesApi } from '../api'
 import { EditorSection, FieldError, LocaleBadge, StringListEditor, TranslatedRepeater, TranslationPrompt } from './fields'
 import {
@@ -25,6 +26,7 @@ import {
   newNotIncluded,
   newTerrain,
   SEASONS,
+  tourReadiness,
   TRAVELLER_TYPES,
   type IconTextForm,
   type LList,
@@ -32,12 +34,15 @@ import {
 } from './model'
 import { asL, type EditorTabProps } from './types'
 
-/** Details tab: copy, route, lists and the classification sidebar (duration, flags, categories, audience, seasons). */
-export function DetailsTab({ form, locale, errors, update }: EditorTabProps) {
+/** Details tab: copy, route, lists and the classification sidebar (readiness, duration, flags, categories, audience, seasons). */
+export function DetailsTab({ form, locale, errors, update, onJumpTab }: EditorTabProps) {
   const t = useTranslations('adminTours.editor.details')
   const tf = useTranslations('adminTours.editor.fields')
   const categories = useAdminQuery(['categories', 'admin'], (signal) => categoriesApi.list(signal))
   const englishDescription = form.description.en.trim()
+  const readiness = tourReadiness(form)
+  const requiredReadiness = readiness.filter((item) => !item.optional)
+  const readinessDone = requiredReadiness.filter((item) => item.ok).length
 
   const overviewValue = (key: keyof OverviewForm) => ({
     en: form.overview.en[key],
@@ -343,12 +348,55 @@ export function DetailsTab({ form, locale, errors, update }: EditorTabProps) {
       </div>
 
       <aside className="flex min-w-0 flex-col gap-5" aria-label={t('sidebar')}>
+        <EditorSection
+          title={t('readiness.title')}
+          aside={
+            <span className="rounded-full bg-surface-container px-2.5 py-0.5 font-body-md text-[12px] font-semibold tabular-nums text-on-surface-variant">
+              {t('readiness.summary', { done: readinessDone, total: requiredReadiness.length })}
+            </span>
+          }
+        >
+          <ul className="flex flex-col gap-1">
+            {readiness.map((item) => {
+              const iconName = item.ok ? 'check_circle' : item.optional ? 'translate' : 'warning'
+              return (
+                <li key={item.key}>
+                  <button
+                    type="button"
+                    disabled={!onJumpTab}
+                    onClick={() => onJumpTab?.(item.tab)}
+                    className={cn(
+                      'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left font-body-md text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                      onJumpTab && 'hover:bg-surface-container-low',
+                      item.ok ? 'text-on-surface' : 'text-on-surface-variant',
+                    )}
+                  >
+                    <Icon
+                      name={iconName}
+                      className={cn(
+                        'shrink-0 text-[16px]',
+                        item.ok ? 'text-tertiary' : item.optional ? 'text-on-surface-variant' : 'text-secondary',
+                      )}
+                    />
+                    <span className="min-w-0 flex-1 truncate">{t(`readiness.items.${item.key}`)}</span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </EditorSection>
+
         <EditorSection title={t('duration')}>
           <div className="grid grid-cols-2 gap-3">
             <NumberField
               label={tf('durationDays')}
               value={form.durationDays}
-              onChange={(v) => update('durationDays', v)}
+              onChange={(v) => {
+                update('durationDays', v)
+                if (v !== null && v >= 1 && form.durationNights === null) {
+                  update('durationNights', Math.max(0, v - 1))
+                }
+              }}
               min={LIMITS.duration.min}
               max={LIMITS.duration.max}
               required

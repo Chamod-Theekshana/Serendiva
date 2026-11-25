@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useLocale, useTranslations } from 'next-intl'
 import { applyFieldErrors, submitInquiry } from '@/lib/api/forms'
-import type { Locale } from '@/lib/api/types'
+import { useSubmissionId } from '@/components/forms/useSubmissionId'
+import { ADULT_COUNTS, CHILD_COUNTS, partyForGuests } from '@/lib/party'
+import type { InquiryBody, Locale } from '@/lib/api/types'
 import { cn } from '@/lib/utils'
 import {
   inquiryDefaults,
@@ -15,10 +17,11 @@ import {
   type InquiryPayload,
 } from '@/lib/validation/inquiry'
 import { FormStatus, useFormFailureMessage, type FormStatusState } from '@/components/forms/FormStatus'
+import { WhatsAppFallback } from '@/components/forms/WhatsAppFallback'
 import { Honeypot } from '@/components/forms/Honeypot'
 import { Turnstile } from '@/components/forms/Turnstile'
 import { WhatsAppLink } from '@/components/layout/WhatsAppLink'
-import { Field, Input, Select } from '@/components/ui/Field'
+import { Field, Input, Select, Textarea, useFieldErrorText } from '@/components/ui/Field'
 import { Icon } from '@/components/ui/Icon'
 import type { MonthOption } from './content'
 
@@ -31,7 +34,7 @@ export interface DestinationInquiryFormProps {
   months: MonthOption[]
 }
 
-const FIELDS = ['name', 'email', 'whatsapp', 'travelWindow', 'durationPreference', 'interests'] as const
+const FIELDS = ['name', 'email', 'whatsapp', 'travelWindow', 'durationPreference', 'interests', 'adults', 'children', 'message'] as const
 
 /** Stitch control look: sand-low field that turns sand on focus (focus ring kept for keyboard users). */
 const CONTROL = 'rounded-lg bg-surface-container-low py-3 shadow-none transition-colors focus:bg-surface'
@@ -52,6 +55,9 @@ export function DestinationInquiryForm({
   const locale = useLocale() as Locale
   const failureMessage = useFormFailureMessage()
   const [status, setStatus] = useState<FormStatusState>(null)
+  /** Body that could not be sent (network / server / rate limit) → offered as a WhatsApp message. */
+  const [unsent, setUnsent] = useState<InquiryBody | null>(null)
+  const [attempts, setAttempts] = useState(0)
   const successRef = useRef<HTMLDivElement>(null)
   const succeeded = status?.kind === 'success'
 
@@ -73,16 +79,29 @@ export function DestinationInquiryForm({
     resolver: zodResolver(inquirySchema),
     defaultValues: defaults,
   })
+  // Validation keys ("tooMany:20") → sentences
+  const interestsError = useFieldErrorText(errors.interests?.message ?? (errors.interests ? 'invalid' : undefined))
 
   useEffect(() => {
     // Move focus to the confirmation so keyboard and screen-reader users land on the reference code.
     if (succeeded) successRef.current?.focus()
   }, [succeeded])
 
+  const submission = useSubmissionId()
+  const sending = useRef(false)
+
   const onSubmit = async (values: InquiryPayload) => {
     setStatus(null)
-    const result = await submitInquiry(toInquiryBody(values))
+    setUnsent(null)
+    const body: InquiryBody = {
+      ...toInquiryBody(values),
+      partyType: partyForGuests(values.adults, values.children),
+      ...(values.travelWindow === t('flexible') ? { flexibleDates: true } : {}),
+    }
+    const result = await submitInquiry({ ...body, clientRequestId: submission.current() })
+    setAttempts((n) => n + 1)
     if (result.ok) {
+      submission.renew()
       setStatus({
         kind: 'success',
         title: t('successTitle', { name: destinationName }),
@@ -92,7 +111,19 @@ export function DestinationInquiryForm({
       return
     }
     if (result.kind === 'validation') applyFieldErrors(setError, result.fieldErrors, FIELDS)
+    else setUnsent(body)
     setStatus({ kind: 'error', message: failureMessage(result) })
+  }
+
+  const handleFormSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (sending.current) {
+      event.preventDefault()
+      return
+    }
+    sending.current = true
+    void handleSubmit(onSubmit)(event).finally(() => {
+      sending.current = false
+    })
   }
 
   const whatsapp = (
@@ -130,7 +161,7 @@ export function DestinationInquiryForm({
   return (
     <form
       noValidate
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={handleFormSubmit}
       aria-label={t('formLabel', { name: destinationName })}
       className="relative flex flex-col gap-space-md"
     >
@@ -147,7 +178,12 @@ export function DestinationInquiryForm({
           {...register('email')}
         />
       </Field>
-      <Field label={t('labels.whatsapp')} error={errors.whatsapp?.message} labelClassName={LABEL}>
+      <Field
+        label={t('labels.whatsapp')}
+        hint={tc('form.whatsappOptional')}
+        error={errors.whatsapp?.message}
+        labelClassName={LABEL}
+      >
         <Input
           type="tel"
           inputMode="tel"
@@ -182,6 +218,26 @@ export function DestinationInquiryForm({
           </Select>
         </Field>
       </div>
+      <div className="grid grid-cols-2 gap-space-sm">
+        <Field label={tc('form.labels.adults')} error={errors.adults?.message} labelClassName={LABEL}>
+          <Select className={cn(CONTROL, 'px-space-sm')} {...register('adults', { valueAsNumber: true })}>
+            {ADULT_COUNTS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label={tc('form.labels.children')} error={errors.children?.message} labelClassName={LABEL}>
+          <Select className={cn(CONTROL, 'px-space-sm')} {...register('children', { valueAsNumber: true })}>
+            {CHILD_COUNTS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </div>
 
       {interests.length > 0 && (
         <fieldset className="mt-1 flex flex-col gap-1.5">
@@ -199,18 +255,23 @@ export function DestinationInquiryForm({
               </label>
             ))}
           </div>
-          {errors.interests && (
+          {interestsError && (
             <p className="flex items-center gap-1 font-caption text-caption text-error">
               <Icon name="error" className="text-sm" />
-              {errors.interests.message ?? tc('form.validation.invalid')}
+              {interestsError}
             </p>
           )}
         </fieldset>
       )}
 
-      <FormStatus state={status ?? (serverRootError ? { kind: 'error', message: serverRootError } : null)} />
+      <Field label={tc('form.labels.message')} error={errors.message?.message} labelClassName={LABEL}>
+        <Textarea rows={3} className={CONTROL} placeholder={t('messagePlaceholder')} {...register('message')} />
+      </Field>
 
-      <Turnstile onToken={(token) => setValue('turnstileToken', token)} action="inquiry" />
+      <FormStatus state={status ?? (serverRootError ? { kind: 'error', message: serverRootError } : null)} />
+      {status?.kind === 'error' && unsent && <WhatsAppFallback inquiry={unsent} about={destinationName} />}
+
+      <Turnstile onToken={(token) => setValue('turnstileToken', token)} action="inquiry" resetKey={attempts} />
       <Honeypot {...register('website')} />
 
       <button

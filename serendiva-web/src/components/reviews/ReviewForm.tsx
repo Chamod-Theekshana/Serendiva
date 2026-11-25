@@ -50,6 +50,8 @@ export function ReviewForm({ countries, tours, maxMonth }: ReviewFormProps) {
   const failureMessage = useFormFailureMessage()
   const [status, setStatus] = useState<FormStatusState>(null)
   const [submitted, setSubmitted] = useState(false)
+  /** Bumped after every send attempt → fresh single-use Turnstile token. */
+  const [attempts, setAttempts] = useState(0)
   const successRef = useRef<HTMLDivElement>(null)
 
   const defaults: ReviewFormValues = {
@@ -91,6 +93,7 @@ export function ReviewForm({ countries, tours, maxMonth }: ReviewFormProps) {
   const onSubmit = async (values: ReviewPayload) => {
     setStatus(null)
     const result = await submitReview(toReviewBody(values))
+    setAttempts((n) => n + 1)
     if (result.ok) {
       setSubmitted(true)
       reset(defaults)
@@ -242,7 +245,7 @@ export function ReviewForm({ countries, tours, maxMonth }: ReviewFormProps) {
       </fieldset>
 
       <Honeypot {...register('website')} />
-      <Turnstile onToken={(token) => setValue('turnstileToken', token)} action="review" />
+      <Turnstile onToken={(token) => setValue('turnstileToken', token)} action="review" resetKey={attempts} />
 
       <p className="flex items-start gap-space-sm rounded-lg bg-surface-container-low p-space-md font-caption text-caption text-on-surface-variant">
         <Icon name="lock" className="mt-0.5 shrink-0 text-base text-tertiary" />

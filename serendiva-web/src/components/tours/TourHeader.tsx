@@ -6,7 +6,7 @@ import type { TourDetail } from '@/lib/api/types'
 import { localizedUrl } from '@/lib/seo'
 import { cn } from '@/lib/utils'
 import { breadcrumbListJsonLd } from '@/components/seo/jsonld'
-import { JsonLd } from '@/components/seo/JsonLd'
+import { JsonLd } from '@/components/seo/JsonLdScript'
 import { Icon } from '@/components/ui/Icon'
 
 const container = 'mx-auto w-full max-w-[1440px] px-margin md:px-margin-md lg:px-margin-lg'

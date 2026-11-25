@@ -91,7 +91,8 @@
       "licensedNoNumber": "SLTDA Licensed National Guide",
       "noObligation": "Zero Obligation, Complimentary Custom Route Plan"
     },
-    "introNoGuide": "Handled personally by your National Chauffeur-Guide. No automated algorithms or rigid group schedules."
+    "introNoGuide": "Handled personally by your National Chauffeur-Guide. No automated algorithms or rigid group schedules.",
+    "messagePlaceholder": "Anything I should know — special occasions, dietary or mobility needs…"
   },
   "journeys": {
     "eyebrow": "Bespoke Ceylon Routes",

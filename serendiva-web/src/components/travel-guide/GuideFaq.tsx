@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server'
 import { getFaqs } from '@/lib/api/public'
 import type { FaqItem, Locale } from '@/lib/api/types'
 import { faqPageJsonLd } from '@/components/seo/jsonld'
-import { JsonLd } from '@/components/seo/JsonLd'
+import { JsonLd } from '@/components/seo/JsonLdScript'
 import { Accordion } from '@/components/ui/Accordion'
 
 const QUESTIONS = ['poya', 'sigiriya', 'flights', 'plugs'] as const

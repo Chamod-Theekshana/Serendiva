@@ -3,15 +3,21 @@
 import { useTranslations } from 'next-intl'
 import { Link, usePathname } from '@/i18n/navigation'
 import { Icon } from '@/components/ui/Icon'
+import { inquiryTarget } from './inquiryTarget'
 import { useWhatsAppHref } from './SiteSettingsProvider'
 import { usePageName } from './usePageName'
+
+const inquireClass =
+  'inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-secondary py-3 font-label-lg text-label-lg uppercase tracking-wider text-on-secondary shadow-[0_4px_16px_rgba(156,68,30,0.2)] transition-colors hover:bg-on-secondary-fixed-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
 
 /** Sticky bottom bar on phones: WhatsApp + Inquire (replaces the floating button below md). */
 export function MobileActionBar() {
   const t = useTranslations('common')
   const pathname = usePathname()
   const href = useWhatsAppHref({ page: usePageName() })
-  const onContact = pathname === '/contact'
+  // On a tour / destination page "Inquire" scrolls to that page's own form (keeps the tour context);
+  // elsewhere it opens the wizard tagged with the page the visitor was on.
+  const target = inquiryTarget(pathname, 'mobile-bar')
   return (
     <div
       role="region"
@@ -28,13 +34,17 @@ export function MobileActionBar() {
         {t('floating.mobileWhatsApp')}
         <span className="sr-only"> {t('a11y.opensInNewTab')}</span>
       </a>
-      <Link
-        href={onContact ? { pathname: '/contact', hash: 'inquiry' } : '/contact'}
-        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-secondary py-3 font-label-lg text-label-lg uppercase tracking-wider text-on-secondary shadow-[0_4px_16px_rgba(156,68,30,0.2)] transition-colors hover:bg-on-secondary-fixed-variant focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-      >
-        <Icon name="edit_calendar" className="text-[18px]" />
-        {t('floating.mobileInquire')}
-      </Link>
+      {target.kind === 'anchor' ? (
+        <a href={`#${target.hash}`} className={inquireClass}>
+          <Icon name="edit_calendar" className="text-[18px]" />
+          {t('floating.mobileInquire')}
+        </a>
+      ) : (
+        <Link href={target.href} className={inquireClass}>
+          <Icon name="edit_calendar" className="text-[18px]" />
+          {t('floating.mobileInquire')}
+        </Link>
+      )}
     </div>
   )
 }

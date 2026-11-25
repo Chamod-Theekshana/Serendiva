@@ -78,4 +78,5 @@ test('submits the proposal as multipart with the PDF and shows the reference', a
   expect(body).toMatch(/name="attachment"; filename="brief\.pdf"/)
   expect(body).toContain('%PDF-1.4')
   expect(body).toContain('name="locale"')
+  expect(body).toContain('name="clientRequestId"')
 })

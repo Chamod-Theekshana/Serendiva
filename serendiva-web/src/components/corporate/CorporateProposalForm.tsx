@@ -18,6 +18,7 @@ import {
 import { FormStatus, useFormFailureMessage } from '@/components/forms/FormStatus'
 import { Honeypot } from '@/components/forms/Honeypot'
 import { Turnstile } from '@/components/forms/Turnstile'
+import { useSubmissionId } from '@/components/forms/useSubmissionId'
 import { Field, Input, Select, Textarea, useFieldErrorText } from '@/components/ui/Field'
 import { Icon } from '@/components/ui/Icon'
 import { attachmentProblem, formatFileSize } from './proposal-file'
@@ -89,6 +90,9 @@ export function CorporateProposalForm({ exampleYear }: CorporateProposalFormProp
   const [status, setStatus] = useState<string | null>(null)
   const [reference, setReference] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
+  /** Bumped after every send attempt → fresh single-use Turnstile token. */
+  const [attempts, setAttempts] = useState(0)
+  const submissionId = useSubmissionId()
   const fileInput = useRef<HTMLInputElement>(null)
   const successHeading = useRef<HTMLHeadingElement>(null)
   const attachmentError = useFieldErrorText(errors.attachment?.message)
@@ -133,8 +137,13 @@ export function CorporateProposalForm({ exampleYear }: CorporateProposalFormProp
 
   const onSubmit = async (values: ProposalPayload) => {
     setStatus(null)
-    const result = await submitProposal(toProposalBody(values))
+    const result = await submitProposal({
+      ...toProposalBody(values),
+      clientRequestId: submissionId.current(),
+    })
+    setAttempts((n) => n + 1)
     if (result.ok) {
+      submissionId.renew()
       setReference(result.data.reference)
       reset(defaults)
       return
@@ -348,7 +357,7 @@ export function CorporateProposalForm({ exampleYear }: CorporateProposalFormProp
       </Field>
 
       <Honeypot {...register('website')} />
-      <Turnstile action="proposal" onToken={(token) => setValue('turnstileToken', token)} />
+      <Turnstile action="proposal" onToken={(token) => setValue('turnstileToken', token)} resetKey={attempts} />
 
       {statusMessage && <FormStatus state={{ kind: 'error', message: statusMessage }} />}
 

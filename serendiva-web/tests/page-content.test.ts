@@ -104,11 +104,25 @@ describe('loadMessages with admin overrides', () => {
     expect(empty).toEqual(plain)
   })
 
-  it('keeps English overrides for other locales (they fall back to English)', async () => {
+  it('keeps English overrides for untranslated namespaces in other locales (they fall back to English)', async () => {
     const messages = await loadMessages('de', [
+      { namespace: 'about', locale: 'en', values: { 'hero.title': 'Guiding Ceylon Personally' }, hidden: [] },
+    ])
+    expect(getAtPath(messages.about, 'hero.title')).toBe('Guiding Ceylon Personally')
+  })
+
+  it('translated locale files win over English overrides until a locale override exists', async () => {
+    const enOnly = await loadMessages('de', [
       { namespace: 'corporate', locale: 'en', values: { 'hero.title': 'Team Retreats' }, hidden: [] },
     ])
-    expect(getAtPath(messages.corporate, 'hero.title')).toBe('Team Retreats')
+    expect(getAtPath(enOnly.corporate, 'hero.title')).not.toBe('Team Retreats')
+    expect(getAtPath(enOnly.corporate, 'hero.title')).toContain('Firmen-Retreats')
+
+    const withDe = await loadMessages('de', [
+      { namespace: 'corporate', locale: 'en', values: { 'hero.title': 'Team Retreats' }, hidden: [] },
+      { namespace: 'corporate', locale: 'de', values: { 'hero.title': 'Team-Retreats' }, hidden: [] },
+    ])
+    expect(getAtPath(withDe.corporate, 'hero.title')).toBe('Team-Retreats')
   })
 })
 

@@ -12,12 +12,14 @@ import {
 import { ContactHero } from '@/components/contact/ContactHero'
 import { CoverageSection } from '@/components/contact/CoverageSection'
 import { InquiryWizard, type WizardAbout } from '@/components/contact/InquiryWizard'
+import { addMonthsIso } from '@/components/contact/wizard-dates'
 import { PlanningProcess } from '@/components/contact/PlanningProcess'
 import { Container } from '@/components/ui/Container'
 import { ClientMessages } from '@/i18n/ClientMessages'
 import type { Locale } from '@/i18n/routing'
-import { getDestination, getSettings, getTour } from '@/lib/api/public'
+import { getAllTours, getAvailability, getDestination, getDestinations, getSettings, getTour } from '@/lib/api/public'
 import type { PublicSettings } from '@/lib/api/types'
+import { countryOptions } from '@/lib/countries'
 import { parseContactPrefill, type ContactPrefill } from '@/lib/prefill'
 import { buildMetadata } from '@/lib/seo'
 
@@ -58,9 +60,24 @@ export default async function ContactPage({ params, searchParams }: PageProps<'/
   const locale = rawLocale as Locale
   setRequestLocale(locale)
 
-  const prefill = parseContactPrefill(await searchParams)
-  const [settings, about] = await Promise.all([loadSettings(locale), loadAbout(locale, prefill)])
   const today = new Date().toISOString().slice(0, 10)
+  const prefill = parseContactPrefill(await searchParams)
+  const [settings, about, calendar, tourList, destinationList] = await Promise.all([
+    loadSettings(locale),
+    loadAbout(locale, prefill),
+    getAvailability({ from: today, to: addMonthsIso(today, 18) }).catch(() => null),
+    getAllTours(locale).catch(() => []),
+    getDestinations(locale).catch(() => null),
+  ])
+  // Busy ranges for the wizard's exact-date warning (same cached call as the sidebar calendar).
+  const busy = (calendar?.ranges ?? []).filter((r) => r.type === 'busy').map((r) => ({ start: r.startDate, end: r.endDate }))
+  const tours = tourList.map((tour) => ({ slug: tour.slug, title: tour.title, durationDays: tour.durationDays }))
+  const destinations = (destinationList?.items ?? []).map((dest) => ({
+    slug: dest.slug,
+    name: dest.name,
+    region: dest.region?.name,
+  }))
+  const countries = countryOptions(locale)
   const guideName = settings?.guide.name ?? null
   const t = await getTranslations({ locale, namespace: 'contact.concierge' })
 
@@ -82,7 +99,17 @@ export default async function ContactPage({ params, searchParams }: PageProps<'/
         <div className="grid grid-cols-1 items-start gap-gutter-lg lg:grid-cols-12">
           <div className="flex min-w-0 flex-col gap-space-lg lg:col-span-8">
             <ClientMessages namespaces={['contact']}>
-              <InquiryWizard prefill={prefill} today={today} about={about} guideName={guideName ?? ''} />
+              <InquiryWizard
+                prefill={prefill}
+                today={today}
+                about={about}
+                guideName={guideName ?? ''}
+                busy={busy}
+                countries={countries}
+                calendar={calendar}
+                tours={tours}
+                destinations={destinations}
+              />
             </ClientMessages>
             <TrustBadges licence={settings?.guide.licenseNumber ?? null} />
           </div>
@@ -96,7 +123,7 @@ export default async function ContactPage({ params, searchParams }: PageProps<'/
             </Suspense>
             <EditorialPhoto image={settings?.pageImages['plan-tea-train-vista'] ?? null} />
             <Suspense fallback={<AvailabilitySkeleton />}>
-              <ContactAvailability locale={locale} />
+              <ContactAvailability locale={locale} calendar={calendar} />
             </Suspense>
           </aside>
         </div>

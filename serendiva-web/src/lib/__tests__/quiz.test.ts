@@ -372,13 +372,14 @@ describe('contact prefill', () => {
 
   const today = new Date(Date.UTC(2026, 9, 5)) // 5 October 2026
 
-  it('builds the /contact prefill with tour, interests, season month, party, adults and source', () => {
+  it('builds the /contact prefill with tour, interests, season range, party, adults, duration and source', () => {
     expect(toContactPrefill(full, { slug: 'cultural-odyssey' }, { message: 'Hi', today })).toEqual({
       tour: 'cultural-odyssey',
       interests: ['cultural-heritage', 'hill-country', 'trekking-adventure'],
-      month: '2026-11',
+      month: '2026-11/2027-04',
       party: 'couple',
       adults: 2,
+      duration: 'indepth',
       message: 'Hi',
       source: 'trip-quiz',
     })
@@ -394,23 +395,24 @@ describe('contact prefill', () => {
     })
   })
 
-  it('maps the season to the next month inside it (YYYY-MM) so /contact can pre-select the travel window', () => {
-    expect(seasonMonth('nov-apr', today)).toBe('2026-11')
-    expect(seasonMonth('may-sep', today)).toBe('2027-05')
-    expect(seasonMonth('jul-aug', today)).toBe('2027-07')
+  it('maps the season to its next stretch (YYYY-MM/YYYY-MM) so /contact shows exactly that range', () => {
+    expect(seasonMonth('nov-apr', today)).toBe('2026-11/2027-04')
+    expect(seasonMonth('may-sep', today)).toBe('2027-05/2027-09')
+    expect(seasonMonth('jul-aug', today)).toBe('2027-07/2027-08')
     expect(seasonMonth('flexible', today)).toBe('flexible')
     // A season that is already running starts next month.
-    expect(seasonMonth('nov-apr', new Date(Date.UTC(2027, 0, 20)))).toBe('2027-02')
-    expect(seasonMonth('jul-aug', new Date(Date.UTC(2027, 6, 1)))).toBe('2027-08')
-    expect(seasonMonth('jul-aug', new Date(Date.UTC(2027, 7, 1)))).toBe('2028-07')
+    expect(seasonMonth('nov-apr', new Date(Date.UTC(2027, 0, 20)))).toBe('2027-02/2027-04')
+    expect(seasonMonth('jul-aug', new Date(Date.UTC(2027, 6, 1)))).toBe('2027-08/2027-08')
+    expect(seasonMonth('jul-aug', new Date(Date.UTC(2027, 7, 1)))).toBe('2028-07/2028-08')
   })
 
   it('serialises to query params understood by parseContactPrefill', () => {
     expect(toContactQuery(full, { slug: 'grand-ceylon-odyssey' }, { today })).toEqual({
       tour: 'grand-ceylon-odyssey',
       interests: 'cultural-heritage,hill-country,trekking-adventure',
-      month: '2026-11',
+      month: '2026-11/2027-04',
       party: 'couple',
+      duration: 'indepth',
       adults: '2',
       source: 'trip-quiz',
     })

@@ -21,3 +21,16 @@ export function dayStatus(day: string, today: string, ranges: AvailabilityCalend
   if (ranges.some((r) => r.type === 'available' && r.startDate <= day && day <= r.endDate)) return 'available'
   return 'onRequest'
 }
+
+/** Next [start, end] selection after clicking `clicked` on a range-picker calendar. */
+export function nextDateRange(currentStart: string, currentEnd: string, clicked: string): { start: string; end: string } {
+  if (!currentStart || (currentStart && currentEnd) || clicked < currentStart) {
+    return { start: clicked, end: '' }
+  }
+  return { start: currentStart, end: clicked }
+}
+
+/** True when `day` falls strictly between `start` and `end` (when both are set). */
+export function isBetweenDates(day: string, start: string, end: string): boolean {
+  return Boolean(start && end && day > start && day < end)
+}

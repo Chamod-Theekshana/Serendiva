@@ -51,15 +51,19 @@ describe('tour inquiry form', () => {
     email: 'claire@example.com',
     whatsapp: '+44 7911 123456',
     month: '2027-03',
-    guests: 'family' as const,
+    adults: '2',
+    children: '1',
     message: '',
   }
 
-  it('requires name, email and WhatsApp with translatable message keys', () => {
+  it('requires name and email (WhatsApp optional) with translatable message keys', () => {
     const result = tourInquirySchema.safeParse(tourInquiryDefaults())
     expect(result.success).toBe(false)
     const issues = result.success ? [] : result.error.issues.map((i) => `${i.path.join('.')}:${i.message}`)
-    expect(issues).toEqual(expect.arrayContaining(['name:required', 'email:required', 'whatsapp:required']))
+    expect(issues).toEqual(expect.arrayContaining(['name:required', 'email:required']))
+    expect(issues.some((i) => i.startsWith('whatsapp'))).toBe(false)
+    expect(tourInquirySchema.safeParse({ ...valid, whatsapp: '' }).success).toBe(true)
+    expect(tourInquirySchema.safeParse({ ...valid, whatsapp: '07911 123456' }).success).toBe(false) // no country code
     expect(tourInquirySchema.safeParse({ ...valid, month: '2027-13' }).success).toBe(false)
     expect(tourInquirySchema.safeParse({ ...valid, whatsapp: 'call me' }).success).toBe(false)
   })
@@ -79,8 +83,8 @@ describe('tour inquiry form', () => {
       email: 'claire@example.com',
       whatsapp: '+44 7911 123456',
       partyType: 'family',
-      adults: 3,
-      children: 0,
+      adults: 2,
+      children: 1,
       interests: [],
       tourSlug: 'cultural-odyssey',
       locale: 'en',
@@ -91,7 +95,7 @@ describe('tour inquiry form', () => {
   })
 
   it('marks flexible dates and keeps optional fields out of the body', () => {
-    const values = tourInquirySchema.parse({ ...valid, month: 'flexible', guests: 'solo', message: 'Vegetarian' })
+    const values = tourInquirySchema.parse({ ...valid, month: 'flexible', adults: '1', children: '0', message: 'Vegetarian' })
     const body = toTourInquiryBody(values, { tourSlug: 'x', locale: 'de', flexibleLabel: 'Flexible dates' })
     expect(body).toMatchObject({ flexibleDates: true, travelWindow: 'Flexible dates', partyType: 'solo', adults: 1 })
     expect(body.message).toBe('Vegetarian')
@@ -99,10 +103,10 @@ describe('tour inquiry form', () => {
   })
 
   it('maps API field paths onto the form fields', () => {
-    expect(mapInquiryFieldErrors({ email: 'bad', travelWindow: 'too long', adults: 'max' })).toEqual({
+    expect(mapInquiryFieldErrors({ email: 'bad', travelWindow: 'too long', adults: 'max', partyType: 'x' })).toEqual({
       email: 'bad',
       month: 'too long',
-      guests: 'max',
+      adults: 'max',
     })
   })
 

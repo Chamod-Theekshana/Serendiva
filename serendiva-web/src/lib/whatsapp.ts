@@ -59,3 +59,74 @@ export function buildWhatsAppMessage({
   if (page) return fill(templates.page, { page })
   return templates.default
 }
+
+/** Field labels of the WhatsApp fallback summary (messages `common.whatsapp.fallback.fields`). */
+export interface InquirySummaryLabels {
+  name: string
+  email: string
+  whatsapp: string
+  country: string
+  party: string
+  guests: string
+  dates: string
+  flexibility: string
+  duration: string
+  pace: string
+  stay: string
+  interests: string
+  about: string
+  message: string
+}
+
+/** The fields of an inquiry the WhatsApp fallback repeats (a subset of InquiryBody). */
+export interface InquirySummaryInput {
+  name?: string
+  email?: string
+  whatsapp?: string
+  country?: string
+  partyType?: string
+  adults?: number
+  children?: number
+  travelStart?: string
+  travelEnd?: string
+  travelWindow?: string
+  flexibility?: string
+  durationPreference?: string
+  pace?: string
+  stayStyle?: string
+  interests?: string[]
+  message?: string
+}
+
+/**
+ * Plain-text summary for the "send it on WhatsApp instead" fallback when the inquiry form cannot be sent:
+ * the intro line, then one "Label: value" line per filled field (the guide gets everything the form held).
+ */
+export function inquirySummaryText(
+  body: InquirySummaryInput,
+  opts: { intro: string; labels: InquirySummaryLabels; about?: string; partyLabel?: string },
+): string {
+  const { labels } = opts
+  const dates =
+    body.travelStart && body.travelEnd ? `${body.travelStart} – ${body.travelEnd}` : (body.travelStart ?? body.travelWindow)
+  const guests =
+    body.adults !== undefined ? `${body.adults}${body.children ? ` + ${body.children}` : ''}` : undefined
+  const lines: [string, string | undefined][] = [
+    [labels.name, body.name],
+    [labels.email, body.email],
+    [labels.whatsapp, body.whatsapp],
+    [labels.country, body.country],
+    [labels.party, opts.partyLabel ?? body.partyType],
+    [labels.guests, guests],
+    [labels.dates, dates],
+    [labels.flexibility, body.flexibility],
+    [labels.duration, body.durationPreference],
+    [labels.pace, body.pace],
+    [labels.stay, body.stayStyle],
+    [labels.interests, body.interests?.length ? body.interests.join(', ') : undefined],
+    [labels.about, opts.about],
+    [labels.message, body.message],
+  ]
+  const filled = lines.filter(([, v]) => v !== undefined && String(v).trim() !== '').map(([k, v]) => `${k}: ${v}`)
+  return [opts.intro, '', ...filled].join('\n').slice(0, 3500)
+}

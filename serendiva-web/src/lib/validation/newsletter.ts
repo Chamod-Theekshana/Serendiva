@@ -8,6 +8,7 @@ export const newsletterSchema = z.object({
   locale: localeSchema,
   source: optionalText(120),
   website: honeypot,
+  turnstileToken: z.string().max(4096).optional(),
 })
 
 export type NewsletterFormValues = z.input<typeof newsletterSchema>

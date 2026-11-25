@@ -17,6 +17,7 @@ import { useFieldErrorText } from '@/components/ui/Field'
 import { Icon } from '@/components/ui/Icon'
 import { FormStatus, useFormFailureMessage, type FormStatusState } from './FormStatus'
 import { Honeypot } from './Honeypot'
+import { Turnstile } from './Turnstile'
 
 export interface NewsletterFormProps {
   /** Stored as `source` (e.g. 'footer', 'blog-banner'). */
@@ -34,28 +35,31 @@ export function NewsletterForm({ source = 'footer', tone = 'footer', labelledBy,
   const locale = useLocale() as Locale
   const failureMessage = useFormFailureMessage()
   const [status, setStatus] = useState<FormStatusState>(null)
+  const [attempts, setAttempts] = useState(0)
   const {
     register,
     handleSubmit,
+    setValue,
     setError,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<NewsletterFormValues, unknown, NewsletterPayload>({
     resolver: zodResolver(newsletterSchema),
-    defaultValues: { email: '', locale, source, website: '' },
+    defaultValues: { email: '', locale, source, website: '', turnstileToken: '' },
   })
   const emailError = useFieldErrorText(errors.email?.message ?? errors.root?.server?.message)
 
   const onSubmit = async (values: NewsletterPayload) => {
     setStatus(null)
     const result = await subscribeNewsletter(toNewsletterBody(values))
+    setAttempts((n) => n + 1)
     if (result.ok) {
       setStatus({
         kind: 'success',
         title:
           result.data.status === 'already_subscribed' ? t('newsletter.alreadySubscribed') : t('newsletter.success'),
       })
-      reset({ email: '', locale, source, website: '' })
+      reset({ email: '', locale, source, website: '', turnstileToken: '' })
       return
     }
     if (result.kind === 'validation' && Object.keys(result.fieldErrors).length > 0)
@@ -128,6 +132,7 @@ export function NewsletterForm({ source = 'footer', tone = 'footer', labelledBy,
         </p>
       )}
       <FormStatus state={status} />
+      <Turnstile onToken={(t) => setValue('turnstileToken', t)} action="newsletter" resetKey={attempts} />
       <Honeypot {...register('website')} />
     </form>
   )

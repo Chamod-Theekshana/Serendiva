@@ -1,15 +1,29 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { useForm, type FieldErrors } from 'react-hook-form'
+import { useForm, useWatch, type FieldErrors } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useLocale, useTranslations } from 'next-intl'
-import type { Locale } from '@/lib/api/types'
+import type { AvailabilityCalendar, InquiryBody, Locale } from '@/lib/api/types'
+import { nextDateRange } from '@/lib/availability'
+import type { CountryOption } from '@/lib/countries'
+import { callingCodeForRegion, combineWhatsApp, regionFromLanguages } from '@/lib/phone'
 import type { ContactPrefill } from '@/lib/prefill'
 import { cn } from '@/lib/utils'
 import { FormStatus, useFormFailureMessage } from '@/components/forms/FormStatus'
+import { useSubmissionId } from '@/components/forms/useSubmissionId'
+import { WhatsAppFallback } from '@/components/forms/WhatsAppFallback'
 import { Icon } from '@/components/ui/Icon'
-import { INTEREST_IDS, WIZARD_STEPS, extraInterestLabel, travelWindowOptions, type InterestId } from './wizard-config'
+import {
+  INTEREST_IDS,
+  WIZARD_STEPS,
+  extraInterestLabel,
+  parseMonthRange,
+  travelWindowOptions,
+  type DestinationPickerOption,
+  type InterestId,
+  type TourPickerOption,
+} from './wizard-config'
 import {
   STEP_COUNT,
   STEP_FIELDS,
@@ -19,11 +33,13 @@ import {
   restoreDraft,
   sendInquiry,
   stepOfField,
+  toInquiryBody,
   wizardSchema,
   type WizardField,
   type WizardLabels,
   type WizardValues,
 } from './wizard-model'
+import type { BusyRange } from './wizard-dates'
 import { StepDates, StepDetails, StepParty, StepPassions } from './WizardSteps'
 import { WizardSuccess } from './WizardSuccess'
 
@@ -41,6 +57,16 @@ export interface InquiryWizardProps {
   about: WizardAbout | null
   /** Guide's name (settings) for the WhatsApp message on the success panel. */
   guideName: string
+  /** The guide's busy ranges (admin availability) — exact dates touching them show a gentle warning. */
+  busy?: readonly BusyRange[]
+  /** Server-generated sorted country suggestions for the Step 4 datalist. */
+  countries?: readonly CountryOption[]
+  /** Availability calendar (for mobile/inline Step 2 date picking). */
+  calendar?: AvailabilityCalendar | null
+  /** Published tour blueprints visitors can optionally pick on Step 3. */
+  tours?: readonly TourPickerOption[]
+  /** Published destinations visitors can tag on Step 3. */
+  destinations?: readonly DestinationPickerOption[]
 }
 
 type FocusTarget = WizardField | 'heading'
@@ -58,12 +84,24 @@ const prefersReducedMotion = () =>
  * validation, step tabs + progress bar, screen-reader step announcements, a sessionStorage draft, server
  * error routing back to the right step, and the success panel with the inquiry reference.
  */
-export function InquiryWizard({ prefill, today, about, guideName }: InquiryWizardProps) {
+export function InquiryWizard({
+  prefill,
+  today,
+  about,
+  guideName,
+  busy,
+  countries = [],
+  calendar = null,
+  tours = [],
+  destinations = [],
+}: InquiryWizardProps) {
   const t = useTranslations('contact.wizard')
   const locale = useLocale() as Locale
   const failureMessage = useFormFailureMessage()
 
-  const windows = useMemo(() => travelWindowOptions(today), [today])
+  // A month range picked on the home hero / in the quiz ("2027-02/2027-04") stays exactly as chosen.
+  const picked = useMemo(() => (prefill.month?.includes('/') ? parseMonthRange(prefill.month) : null), [prefill.month])
+  const windows = useMemo(() => travelWindowOptions(today, 18, picked), [today, picked])
   const initial = useMemo(() => initialWizardState(prefill, windows, today, locale), [prefill, windows, today, locale])
   const context = useMemo(() => prefillSignature(prefill), [prefill])
 
@@ -75,10 +113,14 @@ export function InquiryWizard({ prefill, today, about, guideName }: InquiryWizar
   })
 
   const [step, setStep] = useState(0)
-  const [reference, setReference] = useState<string | null>(null)
+  const [submitted, setSubmitted] = useState<{ reference: string; email: string; hasWhatsApp: boolean } | null>(null)
   const [extraInterests, setExtraInterests] = useState<string[]>(initial.extraInterests)
   const [aboutDismissed, setAboutDismissed] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  /** What could not be sent (network / server / rate limit) — offered as a WhatsApp message instead. */
+  const [unsent, setUnsent] = useState<InquiryBody | null>(null)
+  /** Bumped after every send attempt → the Turnstile widget fetches a fresh (single-use) token. */
+  const [attempts, setAttempts] = useState(0)
   const [announcement, setAnnouncement] = useState('')
   const [restored, setRestored] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -100,14 +142,20 @@ export function InquiryWizard({ prefill, today, about, guideName }: InquiryWizar
       switch (option.kind) {
         case 'immediate':
           return t('dates.windows.immediate')
-        case 'season': {
+        case 'season':
+        case 'range': {
           const sameYear = Math.floor(option.start / 12) === Math.floor(option.end / 12)
           const from = (sameYear ? monthName : monthYear).format(date(option.start))
-          const range = `${from} – ${monthYear.format(date(option.end))}`
-          return t('dates.windows.season', { range, note: t(`dates.windows.notes.${option.season}`) })
+          const range =
+            option.start === option.end ? monthYear.format(date(option.end)) : `${from} – ${monthYear.format(date(option.end))}`
+          return option.kind === 'season'
+            ? t('dates.windows.season', { range, note: t(`dates.windows.notes.${option.season}`) })
+            : range
         }
         case 'later':
           return t('dates.windows.later', { month: monthYear.format(date(option.from)) })
+        case 'flexible':
+          return t('dates.windows.flexible')
         default:
           return option.label
       }
@@ -115,17 +163,92 @@ export function InquiryWizard({ prefill, today, about, guideName }: InquiryWizar
     [windows, locale, t],
   )
 
+  const destinationNames = useMemo(() => new Map(destinations.map((d) => [d.slug, d.name])), [destinations])
+
   const labels: WizardLabels = useMemo(
     () => ({
       travelWindow: windowLabel,
       flexibility: (id) => t(`dates.flexibility.${id}`),
       duration: (id) => t(`dates.durations.${id}.title`),
+      exactDuration: (days) => t('dates.exactDurationValue', { days, nights: Math.max(0, days - 1) }),
       pace: (id) => t(`dates.paces.${id}.title`),
       stay: (id) => t(`passions.stays.${id}.title`),
       interest: (value) => (isInterestId(value) ? t(`passions.interests.${value}`) : extraInterestLabel(value)),
+      destination: (slug) =>
+        destinationNames.get(slug) ??
+        (about?.kind === 'destination' && prefill.destination === slug ? about.title : slug),
+      destinations: t('passions.destinationsField'),
+      budget: t('passions.budgetLabel'),
+      budgetTier: (id) => t(`passions.budgets.${id}.title`),
+      contactMethod: t('details.preferredContactLabel'),
+      preferredContact: (id) => t(`details.contactMethods.${id}`),
+      childAges: t('party.childAges'),
     }),
-    [windowLabel, t],
+    [windowLabel, t, destinationNames, about, prefill.destination],
   )
+
+  const goTo = useCallback(
+    (target: number, focus: FocusTarget = 'heading') => {
+      pendingFocus.current = focus
+      setStep(target)
+      setAnnouncement(
+        t('announceStep', { current: target + 1, total: STEP_COUNT, title: t(`steps.${WIZARD_STEPS[target]!}`) }),
+      )
+    },
+    [t],
+  )
+
+  const onPickDate = useCallback(
+    (iso: string) => {
+      const curFlex = form.getValues('flexibility')
+      const curStart = curFlex === 'fixed' ? form.getValues('travelStart') : ''
+      const curEnd = curFlex === 'fixed' ? form.getValues('travelEnd') : ''
+      const nextRange = nextDateRange(curStart, curEnd, iso)
+      form.setValue('flexibility', 'fixed', { shouldDirty: true })
+      form.setValue('travelStart', nextRange.start, { shouldDirty: true })
+      form.setValue('travelEnd', nextRange.end, { shouldDirty: true })
+      form.clearErrors(['travelWindow', 'travelStart', 'travelEnd'])
+    },
+    [form],
+  )
+
+  const onClearDates = useCallback(() => {
+    form.setValue('travelStart', '', { shouldDirty: true })
+    form.setValue('travelEnd', '', { shouldDirty: true })
+    form.clearErrors(['travelStart', 'travelEnd'])
+  }, [form])
+
+  const watchFlexibility = useWatch({ control: form.control, name: 'flexibility' })
+  const watchStart = useWatch({ control: form.control, name: 'travelStart' })
+  const watchEnd = useWatch({ control: form.control, name: 'travelEnd' })
+
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('serendiva:calendar-sync', {
+        detail:
+          watchFlexibility === 'fixed' && !submitted
+            ? { start: watchStart, end: watchEnd }
+            : { start: '', end: '' },
+      }),
+    )
+  }, [watchFlexibility, watchStart, watchEnd, submitted])
+
+  useEffect(() => {
+    const handlePick = (event: Event) => {
+      const iso = (event as CustomEvent<string>).detail
+      if (typeof iso !== 'string' || !iso) return
+      onPickDate(iso)
+      if (!submitted && step !== 1) goTo(1)
+      cardRef.current?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' })
+    }
+    const handleClear = () => onClearDates()
+    window.addEventListener('serendiva:calendar-pick', handlePick)
+    window.addEventListener('serendiva:calendar-clear', handleClear)
+    return () => {
+      window.removeEventListener('serendiva:calendar-pick', handlePick)
+      window.removeEventListener('serendiva:calendar-clear', handleClear)
+    }
+  }, [onPickDate, onClearDates, step, submitted, goTo])
 
   // ---------------------------------------------------------------------------------------------- draft
 
@@ -144,6 +267,11 @@ export function InquiryWizard({ prefill, today, about, guideName }: InquiryWizar
         setAboutDismissed(draft.aboutDismissed)
         setStep(draft.step)
         setRestored(true)
+      } else {
+        // Default calling code from the browser's region (en-AU → +61), not the UI language (en → +44):
+        // a number saved with the wrong code is a WhatsApp reply that never arrives.
+        const code = callingCodeForRegion(regionFromLanguages(navigator.languages ?? [navigator.language]))
+        if (code) form.setValue('whatsappCode', code)
       }
       draftReady.current = true
     })
@@ -151,10 +279,10 @@ export function InquiryWizard({ prefill, today, about, guideName }: InquiryWizar
   }, [form, initial, context, windows])
 
   const saveDraft = useCallback(() => {
-    if (!draftReady.current || reference) return
+    if (!draftReady.current || submitted) return
     const { website: _website, turnstileToken: _token, ...values } = form.getValues()
     draftStorage.write({ v: 1, context, step, aboutDismissed, extraInterests, values })
-  }, [form, context, step, aboutDismissed, extraInterests, reference])
+  }, [form, context, step, aboutDismissed, extraInterests, submitted])
 
   useEffect(() => {
     saveDraft()
@@ -174,15 +302,7 @@ export function InquiryWizard({ prefill, today, about, guideName }: InquiryWizar
     }
     if (target === 'heading' || UNFOCUSABLE.has(target)) headingRef.current?.focus({ preventScroll: true })
     else form.setFocus(target)
-  }, [step, reference, form])
-
-  const goTo = (target: number, focus: FocusTarget = 'heading') => {
-    pendingFocus.current = focus
-    setStep(target)
-    setAnnouncement(
-      t('announceStep', { current: target + 1, total: STEP_COUNT, title: t(`steps.${WIZARD_STEPS[target]!}`) }),
-    )
-  }
+  }, [step, submitted, form])
 
   const focusField = (field: WizardField) => {
     if (UNFOCUSABLE.has(field)) headingRef.current?.focus()
@@ -219,23 +339,33 @@ export function InquiryWizard({ prefill, today, about, guideName }: InquiryWizar
 
   // ---------------------------------------------------------------------------------------------- submit
 
+  const submission = useSubmissionId()
+  const sending = useRef(false)
+
   const onValid = async (values: WizardValues) => {
     setFormError(null)
+    setUnsent(null)
     setSubmitting(true)
-    const outcome = await sendInquiry(values, {
+    const context = {
       locale,
       labels,
-      tourSlug: aboutDismissed ? undefined : prefill.tour,
-      destinationSlug: aboutDismissed ? undefined : prefill.destination,
       source: prefill.source,
-    })
+      clientRequestId: submission.current(),
+    }
+    const outcome = await sendInquiry(values, context)
     setSubmitting(false)
+    setAttempts((n) => n + 1)
 
     if (outcome.kind === 'success') {
+      submission.renew()
       draftStorage.clear()
       draftReady.current = false
       pendingFocus.current = 'heading'
-      setReference(outcome.reference)
+      setSubmitted({
+        reference: outcome.reference,
+        email: values.email.trim(),
+        hasWhatsApp: Boolean(combineWhatsApp(values.whatsappCode, values.whatsappNumber)),
+      })
       setAnnouncement('')
       return
     }
@@ -249,6 +379,7 @@ export function InquiryWizard({ prefill, today, about, guideName }: InquiryWizar
       return
     }
     setFormError(failureMessage(outcome.failure))
+    setUnsent(toInquiryBody(values, context))
   }
 
   /** Client validation failed on submit (e.g. a restored draft): open the first step with an error. */
@@ -268,15 +399,28 @@ export function InquiryWizard({ prefill, today, about, guideName }: InquiryWizar
       void next()
       return
     }
-    void form.handleSubmit(onValid, onInvalid)(event)
+    // A second click while the first send is still validating or in flight is ignored (the state flag is
+    // set too late for a fast double click: validation is async).
+    if (sending.current) {
+      event.preventDefault()
+      return
+    }
+    sending.current = true
+    void form.handleSubmit(onValid, onInvalid)(event).finally(() => {
+      sending.current = false
+    })
   }
 
   const restart = () => {
     draftStorage.clear()
     form.reset(initial.values)
+    const code = callingCodeForRegion(regionFromLanguages(navigator.languages ?? [navigator.language]))
+    if (code) form.setValue('whatsappCode', code)
     setExtraInterests(initial.extraInterests)
     setAboutDismissed(false)
-    setReference(null)
+    setFormError(null)
+    setUnsent(null)
+    setSubmitted(null)
     setRestored(false)
     draftReady.current = true
     goTo(0)
@@ -284,11 +428,29 @@ export function InquiryWizard({ prefill, today, about, guideName }: InquiryWizar
 
   // ---------------------------------------------------------------------------------------------- render
 
-  const done = reference !== null
+  const done = submitted !== null
+  const showAboutTitle = about && !aboutDismissed ? about.title : undefined
   const progress = done ? 100 : ((step + 1) / STEP_COUNT) * 100
-  const status = formError ? <FormStatus state={{ kind: 'error', message: formError }} /> : null
+  const status = formError ? (
+    <div className="flex flex-col gap-space-sm">
+      <FormStatus state={{ kind: 'error', message: formError }} />
+      {unsent && <WhatsAppFallback inquiry={unsent} about={showAboutTitle} />}
+    </div>
+  ) : null
   const showAbout = about && !aboutDismissed && !done
   const stepProps = { form, headingRef, status, headingId: `wizard-step-${step + 1}-title` }
+
+  const dismissAbout = () => {
+    setAboutDismissed(true)
+    if (about?.kind === 'tour') form.setValue('tourSlug', '', { shouldDirty: true })
+    if (about?.kind === 'destination' && prefill.destination) {
+      form.setValue(
+        'destinations',
+        form.getValues('destinations').filter((s) => s !== prefill.destination),
+        { shouldDirty: true },
+      )
+    }
+  }
 
   return (
     <div
@@ -304,7 +466,7 @@ export function InquiryWizard({ prefill, today, about, guideName }: InquiryWizar
               <span className="truncate">{t('about', { title: about.title })}</span>
               <button
                 type="button"
-                onClick={() => setAboutDismissed(true)}
+                onClick={dismissAbout}
                 aria-label={t('aboutRemove', { title: about.title })}
                 className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-secondary-fixed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
@@ -376,19 +538,35 @@ export function InquiryWizard({ prefill, today, about, guideName }: InquiryWizar
         </div>
 
         {restored && !done && (
-          <p
+          <div
             role="status"
-            className="mt-space-sm flex items-center gap-1 font-caption text-caption text-on-surface-variant"
+            className="mt-space-sm flex flex-wrap items-center justify-between gap-2 font-caption text-caption text-on-surface-variant"
           >
-            <Icon name="history" className="text-sm text-tertiary" />
-            {t('draftRestored')}
-          </p>
+            <span className="flex items-center gap-1">
+              <Icon name="history" className="text-sm text-tertiary" />
+              {t('draftRestored')}
+            </span>
+            <button
+              type="button"
+              onClick={restart}
+              className="rounded font-semibold text-primary underline underline-offset-4 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {t('draftClear')}
+            </button>
+          </div>
         )}
       </div>
 
       <form noValidate aria-label={t('formLabel')} onSubmit={onSubmit} className="pt-space-lg">
-        {done ? (
-          <WizardSuccess reference={reference} guideName={guideName} headingRef={headingRef} onRestart={restart} />
+        {submitted ? (
+          <WizardSuccess
+            reference={submitted.reference}
+            email={submitted.email}
+            hasWhatsApp={submitted.hasWhatsApp}
+            guideName={guideName}
+            headingRef={headingRef}
+            onRestart={restart}
+          />
         ) : step === 0 ? (
           <StepParty {...stepProps} onNext={() => void next()} />
         ) : step === 1 ? (
@@ -398,11 +576,34 @@ export function InquiryWizard({ prefill, today, about, guideName }: InquiryWizar
             onBack={back}
             windows={windows}
             windowLabel={windowLabel}
+            today={today}
+            busy={busy}
+            calendar={calendar}
+            onPickDate={onPickDate}
+            onClearDates={onClearDates}
           />
         ) : step === 2 ? (
-          <StepPassions {...stepProps} onNext={() => void next()} onBack={back} extraInterests={extraInterests} />
+          <StepPassions
+            {...stepProps}
+            onNext={() => void next()}
+            onBack={back}
+            extraInterests={extraInterests}
+            tours={tours}
+            destinations={destinations}
+            about={about}
+          />
         ) : (
-          <StepDetails {...stepProps} onBack={back} submitting={submitting} />
+          <StepDetails
+            {...stepProps}
+            onBack={back}
+            submitting={submitting}
+            turnstileReset={attempts}
+            countries={countries}
+            tours={tours}
+            destinations={destinations}
+            windowLabel={windowLabel}
+            onEditStep={(target) => goTo(target)}
+          />
         )}
       </form>
 

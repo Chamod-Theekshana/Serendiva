@@ -1,7 +1,7 @@
 import 'server-only'
 import { getDestinations, getRegions } from '@/lib/api/public'
 import type { DestinationCard, Locale, Region } from '@/lib/api/types'
-import { hubPosition, layoutLabels, shortHubLabel } from './islandMap'
+import { hubPosition, layoutLabels, shortHubLabel } from './islandMapGeometry'
 import type { MapHub, MapRegion } from './IslandMap'
 import { regionIndexMap } from './regionTones'
 
